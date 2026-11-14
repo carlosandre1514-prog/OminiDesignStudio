@@ -79,7 +79,6 @@ Itens que dependem de fases futuras (não são pendências das fases entregues):
 - Visualização e miniatura de modelos 3D da biblioteca — chega com o viewport 3D (Fase 4).
 - Materiais como tipo de asset — depende do editor PBR (Fase 4); prefabs — dependem do editor de jogos (Fase 5). Hoje são categorias de organização.
 - Restante da Fase 6: sistema de plugins, otimizações e testes de integração adicionais.
-- **Validação contra um projeto Supabase real**: o ambiente de desenvolvimento não tem acesso a supabase.com nem Docker para o Supabase local. O SQL foi validado num PostgreSQL 16 real (com substitutos de `auth`/`storage`) e o app de ponta a ponta contra um servidor local que imita a API do Supabase. Falta executar o mesmo fluxo num projeto Supabase de verdade (precisa da Project URL e da chave pública).
 
 Limitações conscientes:
 - A interação "mostrar/ocultar" fica disponível apenas em telas (não dentro de componentes mestres), pois os alvos pertencem à tela.
@@ -108,10 +107,11 @@ Limitações conscientes:
 - `e2e/assets.mjs` — importação (válidos, inválido rejeitado, duplicado reaproveitado), renomear/tag/filtro, pastas, imagem da biblioteca no canvas, exportação HTML com o arquivo do asset, aba do projeto, exportação e reimportação do pacote do projeto. ✅
 - `e2e/advanced.mjs` — rotação (campo e alça), estado pressionado, desabilitado, ícone da biblioteca, transição animada, ajuste por breakpoint preservando a base e aplicado na pré-visualização de celular, criação de componente e propagação do mestre para instâncias, componente salvo na biblioteca, fonte da biblioteca, CSS exportado. ✅
 - `npm run test:sql` — script do Supabase aplicado duas vezes num PostgreSQL 16 real: RLS por usuário (registros e arquivos), anônimo sem acesso, revisão +1, revisão inicial 1, hash válido, sem exclusão física, referência de payload restrita ao próprio usuário, arquivos imutáveis. ✅
-- `e2e/cloud.mjs` — supabase-js real contra servidor local que imita o Supabase: configuração pela interface (chave secreta recusada), cadastro, consentimento, sincronização, senha errada, segundo dispositivo, edição nos dois sentidos, asset com arquivo, offline com pendências, conflito, "manter ambos", sair preservando dados. ✅
+- **Validado no projeto Supabase real** (14/11/2026): script aplicado, checagem de segurança do Supabase sem problemas de banco, e `e2e/cloud.mjs` em modo real (`SUPABASE_URL`/`SUPABASE_ANON_KEY`) passou de ponta a ponta — cadastro, login, dois dispositivos, edição nos dois sentidos, asset com arquivo no Storage, offline, conflito, "manter ambos", sair — além do isolamento entre contas (outra conta não lê, não grava em nome de outro, não altera e não baixa arquivos; nem o dono apaga fisicamente). ✅
+- `e2e/cloud.mjs` (modo local) — supabase-js real contra servidor local que imita o Supabase: configuração pela interface (chave secreta recusada), cadastro, consentimento, sincronização, senha errada, segundo dispositivo, edição nos dois sentidos, asset com arquivo, offline com pendências, conflito, "manter ambos", sair preservando dados. ✅
 - Verificação manual: os projetos React e React+Tailwind exportados passam em `tsc` e `vite build` e executam o protótipo (navegação + modal) corretamente.
 
 ## Próximas tarefas
-1. Validar a sincronização num projeto Supabase real (assim que a Project URL e a chave pública forem fornecidas).
+1. Antes de abrir para outras pessoas: SMTP próprio no Supabase (o envio padrão só entrega para a equipe do projeto e tem limite por hora) e religar "Confirm email".
 2. Fase 4 — 3D Design Studio: viewport (Three.js/R3F, carregado sob demanda), primitivas, transformações, modo de edição, materiais PBR com texturas da biblioteca, iluminação, importação GLB/GLTF/OBJ/FBX/STL a partir da biblioteca e exportação GLB/GLTF/OBJ/STL/PNG.
 3. Fase 5 — Game Design Studio (GDD, editor 2D, tilemaps, spritesheets, lógica por nodes).

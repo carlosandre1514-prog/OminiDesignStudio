@@ -7,7 +7,12 @@ const require = createRequire(import.meta.url);
 const { chromium } = require('playwright');
 
 const BASE = process.env.BASE_URL ?? 'http://localhost:4173';
-const supa = await startFakeSupabase(54399);
+// REAL mode: SUPABASE_URL + SUPABASE_ANON_KEY point at a real project; otherwise the local stand-in is used.
+const REAL = !!process.env.SUPABASE_URL;
+const supa = REAL
+  ? { url: process.env.SUPABASE_URL, anonKey: process.env.SUPABASE_ANON_KEY, stats: () => null, close: async () => undefined }
+  : await startFakeSupabase(54399);
+const createdAccounts = [];
 const SHOTS = process.env.SHOTS_DIR;
 const errors = [];
 const assert = (cond, msg) => {
@@ -35,7 +40,8 @@ async function newDevice(name) {
   page.on('dialog', (d) => d.accept());
   return { ctx, page };
 }
-const email = `e2e${Date.now()}@example.com`;
+const email = REAL ? `omni-e2e-${Date.now()}@mailinator.com` : `e2e${Date.now()}@example.com`;
+createdAccounts.push(email);
 const password = 'senha-super-forte-1';
 
 // ---------------- Device A: create local work, then sign up ----------------
@@ -115,7 +121,7 @@ await A.page.getByTestId('asset-input').setInputFiles({ name: 'logo-nuvem.png', 
 await A.page.getByTestId('asset-card').first().waitFor();
 await A.page.goto(`${BASE}/account`);
 await A.page.getByRole('button', { name: 'Sincronizar agora' }).click();
-await until(async () => (await A.page.getByTestId('sync-pending').textContent()) === '0' && supa.stats().files === 1);
+await until(async () => (await A.page.getByTestId('sync-pending').textContent()) === '0' && (REAL || supa.stats().files === 1));
 await B.page.goto(`${BASE}/account`);
 await B.page.getByRole('button', { name: 'Sincronizar agora' }).click();
 await until(async () => (await B.page.getByTestId('sync-report').textContent()).includes('1 recebidos'));
@@ -161,8 +167,13 @@ assert(await until(async () => (await B.page.getByText('Conflitos (1)').count())
 await B.page.goto(`${BASE}/projects`);
 assert(await until(async () => (await B.page.getByText('Projeto Nuvem (cópia local)').count()) === 1), 'cópia local do B preservada');
 
-// A receives the copy too.
+// A receives the copy too (wait for B to finish uploading it, and for A's sync to finish before navigating).
+await B.page.goto(`${BASE}/account`);
+await until(async () => (await B.page.getByTestId('sync-pending').textContent()) === '0' && (await B.page.getByTestId('sync-status').textContent()) === 'Sincronizado', 30000);
+await A.page.goto(`${BASE}/account`);
+await until(async () => (await A.page.getByTestId('sync-status').textContent()) === 'Sincronizado', 30000);
 await A.page.getByRole('button', { name: 'Sincronizar agora' }).click();
+await until(async () => (await A.page.getByTestId('sync-status').textContent()) === 'Sincronizado' && /[1-9]\d* recebidos/.test(await A.page.getByTestId('sync-report').textContent()), 30000);
 await A.page.goto(`${BASE}/projects`);
 assert(await until(async () => (await A.page.getByText('Projeto Nuvem (cópia local)').count()) === 1), 'cópia criada em B chega ao A');
 
@@ -173,8 +184,36 @@ await A.page.getByRole('button', { name: 'Entrar' }).first().waitFor();
 await A.page.goto(`${BASE}/projects`);
 assert(await until(async () => (await A.page.getByText('Projeto Nuvem').count()) >= 1), 'sair mantém os dados locais');
 
-const st = supa.stats();
-assert(st.users === 1 && st.rows >= 3 && st.files === 1, `servidor recebeu os dados (${JSON.stringify(st)})`);
+if (REAL) {
+  // Isolation on the real project: a second account sees none of the first account's records or files.
+  const h = { apikey: supa.anonKey, 'Content-Type': 'application/json' };
+  const login = async (em, pw, signup) => (await (await fetch(`${supa.url}/auth/v1/${signup ? 'signup' : 'token?grant_type=password'}`, { method: 'POST', headers: h, body: JSON.stringify({ email: em, password: pw }) })).json());
+  const a = await login(email, password, false);
+  const mineA = await (await fetch(`${supa.url}/rest/v1/omni_records?select=kind,id,owner`, { headers: { ...h, Authorization: `Bearer ${a.access_token}` } })).json();
+  assert(Array.isArray(mineA) && mineA.length >= 3 && mineA.every((r) => r.owner === a.user.id), `conta A vê os próprios ${mineA.length} registros na nuvem real`);
+  const other = `omni-e2e-${Date.now()}-b@mailinator.com`;
+  createdAccounts.push(other);
+  const b = await login(other, password, true);
+  const auth = { ...h, Authorization: `Bearer ${b.access_token}` };
+  const seen = await (await fetch(`${supa.url}/rest/v1/omni_records?select=id`, { headers: auth })).json();
+  assert(Array.isArray(seen) && seen.length === 0, 'outra conta não vê nenhum registro da conta A');
+  const forged = await fetch(`${supa.url}/rest/v1/omni_records`, { method: 'POST', headers: auth, body: JSON.stringify({ owner: a.user.id, kind: 'project', id: 'invasao', revision: 1, hash: 'a'.repeat(64) }) });
+  assert(forged.status === 403 || forged.status === 401, `outra conta não grava em nome da conta A (HTTP ${forged.status})`);
+  const tamper = await fetch(`${supa.url}/rest/v1/omni_records?owner=eq.${a.user.id}`, { method: 'PATCH', headers: { ...auth, Prefer: 'return=representation' }, body: JSON.stringify({ deleted: true }) });
+  assert((await tamper.json()).length === 0, 'outra conta não altera registros da conta A');
+  const blob = mineA.find((r) => r.kind === 'asset');
+  const assetRow = blob && (await (await fetch(`${supa.url}/rest/v1/omni_records?kind=eq.asset&select=payload`, { headers: { ...h, Authorization: `Bearer ${a.access_token}` } })).json())[0];
+  const file = await fetch(`${supa.url}/storage/v1/object/omni-assets/${a.user.id}/blobs/${assetRow.payload.hash}`, { headers: auth });
+  assert(file.status >= 400, `outra conta não baixa arquivos da conta A (HTTP ${file.status})`);
+  const own = await fetch(`${supa.url}/storage/v1/object/omni-assets/${a.user.id}/blobs/${assetRow.payload.hash}`, { headers: { ...h, Authorization: `Bearer ${a.access_token}` } });
+  assert(own.status === 200, 'a própria conta baixa o arquivo do asset');
+  const del = await fetch(`${supa.url}/rest/v1/omni_records?id=eq.${mineA[0].id}`, { method: 'DELETE', headers: { ...h, Authorization: `Bearer ${a.access_token}` } });
+  assert(del.status === 401 || del.status === 403, `nem o dono apaga registros fisicamente (HTTP ${del.status})`);
+  console.log(`\nContas de teste criadas: ${createdAccounts.join(', ')}`);
+} else {
+  const st = supa.stats();
+  assert(st.users === 1 && st.rows >= 3 && st.files === 1, `servidor recebeu os dados (${JSON.stringify(st)})`);
+}
 await browser.close();
 await supa.close();
 assert(errors.length === 0, `sem erros de página ${errors.length ? JSON.stringify(errors) : ''}`);

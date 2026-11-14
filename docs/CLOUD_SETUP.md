@@ -23,7 +23,12 @@ projetos, assets (com os arquivos), pastas da biblioteca e versões entre dispos
 > A chave pública foi feita para ficar no navegador: quem protege os dados são as políticas RLS do script.
 > Chaves secretas (`service_role` / `sb_secret_…`) são recusadas pelo app.
 
-## 3. Como a sincronização funciona
+## 3. E-mails de verdade (antes de abrir para outras pessoas)
+O envio de e-mails padrão do Supabase só entrega para membros da equipe do projeto e tem limite baixo por hora.
+Para confirmação de cadastro e redefinição de senha de qualquer pessoa, configure um provedor em
+**Authentication → Emails → SMTP Settings** (ex.: Resend, Brevo, SendGrid) e mantenha **Confirm email** ligado.
+
+## 4. Como a sincronização funciona
 - Cada registro tem uma **revisão** e um **hash** do conteúdo. O app guarda, por conta, o último estado
   em que o dispositivo e a nuvem concordaram.
 - Alterações só locais são enviadas com escrita condicional ("só grave se a revisão ainda for N").
@@ -39,9 +44,12 @@ projetos, assets (com os arquivos), pastas da biblioteca e versões entre dispos
   ao voltar a ficar online e ao reabrir o app; e manualmente em **Sincronizar agora**.
 - Sair da conta não apaga nada deste dispositivo.
 
-## 4. Testes
+## 5. Testes
 - `npm run test:sql` — aplica o script num PostgreSQL 16 local (com substitutos mínimos dos esquemas
   `auth`/`storage` do Supabase) e verifica RLS, revisões, lápides e regras do Storage.
 - `npm test` — motor de sincronização (dois dispositivos, conflitos, exclusões, assets, isolamento) e o adaptador Supabase.
+- `NODE_USE_ENV_PROXY=1 SUPABASE_URL=… SUPABASE_ANON_KEY=… node e2e/cloud.mjs` — o mesmo fluxo contra um projeto
+  Supabase real (cria contas descartáveis `omni-e2e-…@mailinator.com`; exige "Confirm email" desligado durante o teste),
+  incluindo verificações de isolamento entre contas. Apague as contas de teste depois.
 - `node e2e/cloud.mjs` — fluxo completo no navegador com o supabase-js real contra
   `e2e/fake-supabase.mjs`, um servidor local que imita a API do Supabase usada pelo app.
