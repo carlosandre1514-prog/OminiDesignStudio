@@ -41,3 +41,10 @@
 - **Uma regra de layout, duas formas**: `resolveConstraintBox()` (números, usada no canvas/pré-visualização/instâncias) espelha `boxCss()` (CSS exportado); há teste de equivalência. A cascata de breakpoints (`cascadeOrder`) é a mesma nos dois lados.
 - **Árvore de renderização** (`export/tree.ts`): exportadores HTML, React e Tailwind consomem os mesmos nós (CSS base, estados, media queries, filhos de instância), evitando divergências.
 - **Componentes** são quadros (`WDComponent` = mesma forma de uma tela) guardados em `doc.components`; instâncias referenciam o mestre por id e renderizam os filhos pelas constraints. Ícones são dados vetoriais Lucide carregados sob demanda.
+
+## Nuvem (Supabase)
+- **Motor independente do backend** (`src/core/cloud/engine.ts`): compara local × último estado acordado (`syncState`, por conta) × nuvem, usando hash do conteúdo e revisões. O backend é uma interface (`RemoteStore`) — implementada por `SupabaseRemote` e, nos testes, por um armazenamento em memória com as mesmas regras.
+- **Adaptadores locais** (`kinds.ts`) leem/gravam cada tipo (projeto, versão, asset, pasta) recebendo a instância do banco, o que permite simular dois dispositivos nos testes. Todo dado recebido é validado.
+- **Segurança no servidor**: RLS por `owner = auth.uid()`, gatilho que exige revisão +1, sem DELETE, Storage só com criação em caminhos endereçados por hash do próprio usuário.
+- **Integração com editores** por ganchos (`hooks.ts`): gravar antes de sincronizar; recarregar o projeto aberto quando ele muda pela nuvem.
+- O SDK do Supabase é carregado sob demanda, só quando a nuvem está configurada.

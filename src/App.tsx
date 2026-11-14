@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect } from 'react';
 import { BrowserRouter, Route, Routes } from 'react-router-dom';
+import { useCloud } from '@/core/cloud/cloudStore';
 import { useSettings } from '@/core/settings/settings';
 import { AppShell } from '@/ui/AppShell';
 import { ErrorBoundary } from '@/ui/ErrorBoundary';
@@ -7,6 +8,7 @@ import { Toaster } from '@/ui/Toaster';
 import Dashboard from '@/pages/Dashboard';
 
 const Projects = lazy(() => import('@/pages/Projects'));
+const Account = lazy(() => import('@/pages/Account'));
 const Assets = lazy(() => import('@/pages/Assets'));
 const Templates = lazy(() => import('@/pages/Templates'));
 const History = lazy(() => import('@/pages/History'));
@@ -18,6 +20,7 @@ const NotFound = lazy(() => import('@/pages/NotFound'));
 export default function App() {
   const { load, settings } = useSettings();
   useEffect(() => void load(), [load]);
+  useEffect(() => void useCloud.getState().init(), []);
   useEffect(() => {
     document.documentElement.dataset.reduceMotion = String(settings.reduceMotion);
   }, [settings.reduceMotion]);
@@ -30,6 +33,7 @@ export default function App() {
             <Route element={<AppShell />}>
               <Route index element={<Dashboard />} />
               <Route path="projects" element={<Projects />} />
+              <Route path="account" element={<Account />} />
               <Route path="assets" element={<Assets />} />
               <Route path="templates" element={<Templates />} />
               <Route path="history" element={<History />} />

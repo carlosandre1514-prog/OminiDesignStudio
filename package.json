@@ -10,9 +10,11 @@
     "typecheck": "tsc -b",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "node e2e/smoke.mjs && node e2e/assets.mjs && node e2e/advanced.mjs"
+    "test:e2e": "node e2e/smoke.mjs && node e2e/assets.mjs && node e2e/advanced.mjs && node e2e/cloud.mjs",
+    "test:sql": "bash supabase/tests/run.sh"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.80.0",
     "dexie": "^4.0.11",
     "dexie-react-hooks": "^1.1.7",
     "jszip": "^3.10.1",

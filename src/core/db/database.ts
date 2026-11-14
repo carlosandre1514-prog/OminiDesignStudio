@@ -1,5 +1,6 @@
 import Dexie, { type EntityTable } from 'dexie';
 import type { Asset, AssetData, AssetFolder } from '@/core/assets/types';
+import type { SyncConflict, SyncStateRecord } from '@/core/cloud/types';
 import type { HistoryEntry, ProjectDocument, ProjectMeta, ProjectVersion } from '@/core/projects/types';
 
 export interface SettingRecord {
@@ -21,6 +22,8 @@ export class OmniDatabase extends Dexie {
   assets!: EntityTable<Asset, 'id'>;
   assetData!: EntityTable<AssetData, 'hash'>;
   folders!: EntityTable<AssetFolder, 'id'>;
+  syncState!: EntityTable<SyncStateRecord, 'key'>;
+  syncConflicts!: EntityTable<SyncConflict, 'key'>;
 
   constructor(name = 'omnidesign-studio') {
     super(name);
@@ -36,6 +39,11 @@ export class OmniDatabase extends Dexie {
       assets: 'id, name, kind, category, folderId, hash, createdAt, updatedAt, *tags, *projectIds',
       assetData: 'hash',
       folders: 'id, parentId, name',
+    });
+    // v3 (Fase 6): cloud sync bookkeeping. Last synced revision/hash per record and account, plus open conflicts.
+    this.version(3).stores({
+      syncState: 'key, owner, [owner+kind]',
+      syncConflicts: 'key, owner, kind, recordId',
     });
   }
 }

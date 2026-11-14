@@ -1,6 +1,6 @@
 # DEVELOPMENT_STATUS
 
-_Última atualização: 2026-11-14 (pendências das Fases 1–3)_
+_Última atualização: 2026-11-14 (login e sincronização em nuvem)_
 
 ## Fases concluídas
 
@@ -53,6 +53,24 @@ _Última atualização: 2026-11-14 (pendências das Fases 1–3)_
 - **Fontes da biblioteca no Web Design**: seletor de fonte lista as fontes da Asset Library (e permite importar), o canvas as carrega via FontFace e a exportação inclui os arquivos com `@font-face`.
 - **Configurações aplicadas na hora**: intervalo de versão automática e atraso do salvamento automático passam a valer imediatamente no projeto aberto (antes só no próximo projeto).
 
+### ✅ Fase 6 (parte) — Login e sincronização em nuvem (Supabase)
+- **Login** por e-mail e senha: criar conta (com confirmação de e-mail quando o projeto exige), entrar, sair (dados locais preservados), esqueci a senha (link por e-mail → definir nova senha no app), reenviar confirmação. Mensagens de erro claras em português.
+- **Configuração** pela tela "Conta e nuvem" (Project URL + chave pública) ou no build (`.env`). Chaves secretas (`service_role`, `sb_secret_`) são recusadas.
+- **Sincronização** de projetos, versões, assets (com os arquivos) e pastas da biblioteca:
+  1. identifica alterações locais (hash do conteúdo vs. último estado acordado, sem depender de rastrear cada escrita);
+  2. compara com as revisões da nuvem;
+  3. envia/baixa com escrita condicional por revisão;
+  4. identifica conflitos (edição dupla, exclusão × edição, criação dupla);
+  5. nunca sobrescreve em silêncio;
+  6. resolução manual: manter deste dispositivo / da nuvem (com ponto de restauração da versão local) / ambos;
+  7. relatório da sincronização concluída (enviados, recebidos, exclusões, conflitos, erros).
+- Exclusões propagadas por lápides; registros grandes (> 2 MB) e arquivos no Storage, endereçados por SHA-256 e com integridade verificada no download; dados vindos da nuvem são validados antes de gravar.
+- Automática (ao entrar, por intervalo configurável, após alterações, ao voltar online, ao reabrir) e manual; funciona offline e acumula pendências.
+- Consentimento antes de enviar os dados locais para uma conta pela primeira vez neste dispositivo; contas isoladas.
+- Editor aberto grava antes de sincronizar e recarrega quando o projeto muda pela nuvem.
+- Indicadores na barra lateral (sincronizado, pendências, conflitos, offline, erro) e local de armazenamento "Local + nuvem" nos detalhes do projeto.
+- Script SQL do Supabase (`supabase/migrations/0001_omnidesign_sync.sql`) com RLS, gatilho de revisão, sem exclusão física, bucket privado com arquivos imutáveis. Guia em `docs/CLOUD_SETUP.md`.
+
 ## Fases em andamento
 Nenhuma. Próxima: **Fase 4 — 3D Design Studio**.
 
@@ -60,7 +78,8 @@ Nenhuma. Próxima: **Fase 4 — 3D Design Studio**.
 Itens que dependem de fases futuras (não são pendências das fases entregues):
 - Visualização e miniatura de modelos 3D da biblioteca — chega com o viewport 3D (Fase 4).
 - Materiais como tipo de asset — depende do editor PBR (Fase 4); prefabs — dependem do editor de jogos (Fase 5). Hoje são categorias de organização.
-- Autenticação e sincronização em nuvem — Fase 6; requer um projeto Supabase/Firebase e credenciais do proprietário.
+- Restante da Fase 6: sistema de plugins, otimizações e testes de integração adicionais.
+- **Validação contra um projeto Supabase real**: o ambiente de desenvolvimento não tem acesso a supabase.com nem Docker para o Supabase local. O SQL foi validado num PostgreSQL 16 real (com substitutos de `auth`/`storage`) e o app de ponta a ponta contra um servidor local que imita a API do Supabase. Falta executar o mesmo fluxo num projeto Supabase de verdade (precisa da Project URL e da chave pública).
 
 Limitações conscientes:
 - A interação "mostrar/ocultar" fica disponível apenas em telas (não dentro de componentes mestres), pois os alvos pertencem à tela.
@@ -71,7 +90,7 @@ Limitações conscientes:
 - Tamanho de projeto exibido é aproximado (tamanho do JSON serializado).
 
 ## Testes realizados
-- `npm test` — 62 testes (Vitest, IndexedDB simulado por fake-indexeddb):
+- `npm test` — 79 testes (Vitest, IndexedDB simulado por fake-indexeddb):
   - histórico (commit/undo/redo/gestos/limite);
   - serviço de projetos (CRUD, favoritos, duplicação profunda, versões, restauração não destrutiva, poda de versões automáticas, export/import `.omni`, validação de arquivos corrompidos, exclusão em cascata);
   - operações do editor (mover, grupos, redimensionar grupos, exclusão em cascata, duplicação com remapeamento, ordem Z, alinhar/distribuir, smart snap, telas, normalização de dados corrompidos);
@@ -82,12 +101,17 @@ Limitações conscientes:
   - breakpoints (ordem de cascata, projeção memorizada, gravação de ajustes sem alterar a base, visibilidade, fonte, limpeza, store com desfazer);
   - componentes (criação a partir da seleção, ciclos, desvincular com textos sobrescritos, exclusão sem perda, normalização, publicação/leitura na biblioteca);
   - exportação avançada (rotação, `:active`, `:focus-within`, desabilitado, ícones SVG, `@media` na ordem correta, instâncias aninhadas, transições, `@font-face`, variantes Tailwind);
+  - sincronização (10 cenários com dois dispositivos: envio/recebimento, edições sequenciais, campos locais sem tráfego, conflito e as três resoluções, exclusões e exclusão × edição, assets com verificação de integridade, isolamento de contas, rejeição de dados inválidos);
+  - adaptador Supabase (filtros e paginação, escrita condicional, duplicidade, registros grandes no Storage, integridade, arquivos existentes/ausentes, erros) e validação de chaves;
   - pacotes de projeto (busca/reescrita de referências, ida e volta em biblioteca vazia com remapeamento inclusive nas versões, reaproveitamento, dependências ausentes, ZIP inválido).
 - `npm run test:e2e` — fluxo completo no navegador (Chromium): criar projeto por modelo, inserir, arrastar, desfazer/refazer, editar texto, protótipo com navegação e modal, troca de dispositivo, exportação, persistência após recarregar, dashboard, indicador offline, layout mobile sem rolagem horizontal, ausência de erros no console. ✅
 - `e2e/assets.mjs` — importação (válidos, inválido rejeitado, duplicado reaproveitado), renomear/tag/filtro, pastas, imagem da biblioteca no canvas, exportação HTML com o arquivo do asset, aba do projeto, exportação e reimportação do pacote do projeto. ✅
 - `e2e/advanced.mjs` — rotação (campo e alça), estado pressionado, desabilitado, ícone da biblioteca, transição animada, ajuste por breakpoint preservando a base e aplicado na pré-visualização de celular, criação de componente e propagação do mestre para instâncias, componente salvo na biblioteca, fonte da biblioteca, CSS exportado. ✅
+- `npm run test:sql` — script do Supabase aplicado duas vezes num PostgreSQL 16 real: RLS por usuário (registros e arquivos), anônimo sem acesso, revisão +1, revisão inicial 1, hash válido, sem exclusão física, referência de payload restrita ao próprio usuário, arquivos imutáveis. ✅
+- `e2e/cloud.mjs` — supabase-js real contra servidor local que imita o Supabase: configuração pela interface (chave secreta recusada), cadastro, consentimento, sincronização, senha errada, segundo dispositivo, edição nos dois sentidos, asset com arquivo, offline com pendências, conflito, "manter ambos", sair preservando dados. ✅
 - Verificação manual: os projetos React e React+Tailwind exportados passam em `tsc` e `vite build` e executam o protótipo (navegação + modal) corretamente.
 
 ## Próximas tarefas
-1. Fase 4 — 3D Design Studio: viewport (Three.js/R3F, carregado sob demanda), primitivas, transformações, modo de edição, materiais PBR com texturas da biblioteca, iluminação, importação GLB/GLTF/OBJ/FBX/STL a partir da biblioteca e exportação GLB/GLTF/OBJ/STL/PNG.
-2. Fase 5 — Game Design Studio (GDD, editor 2D, tilemaps, spritesheets, lógica por nodes).
+1. Validar a sincronização num projeto Supabase real (assim que a Project URL e a chave pública forem fornecidas).
+2. Fase 4 — 3D Design Studio: viewport (Three.js/R3F, carregado sob demanda), primitivas, transformações, modo de edição, materiais PBR com texturas da biblioteca, iluminação, importação GLB/GLTF/OBJ/FBX/STL a partir da biblioteca e exportação GLB/GLTF/OBJ/STL/PNG.
+3. Fase 5 — Game Design Studio (GDD, editor 2D, tilemaps, spritesheets, lógica por nodes).

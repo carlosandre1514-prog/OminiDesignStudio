@@ -11,6 +11,8 @@ import {
 } from '@/core/projects/projectService';
 import { PROJECT_CATEGORIES, type ProjectCategory, type ProjectMeta } from '@/core/projects/types';
 import { formatBytes } from '@/core/utils/download';
+import { useCloud } from '@/core/cloud/cloudStore';
+import { db } from '@/core/db/database';
 import { Modal } from './Modal';
 import { fmtDate } from './ProjectCard';
 import { toast } from './toast';
@@ -32,6 +34,8 @@ export function ProjectDetailsDialog({ project, onClose, onRestored }: Props) {
   const versions = useLiveQuery(() => listVersions(project.id), [project.id]);
   const history = useLiveQuery(() => getHistory(project.id), [project.id]);
   const size = useLiveQuery(() => estimateProjectSize(project.id), [project.id]);
+  const uid = useCloud((s) => s.user?.uid);
+  const synced = useLiveQuery(async () => (uid ? !!(await db.syncState.get(`${uid}|project|${project.id}`)) : false), [uid, project.id]);
 
   const saveInfo = async () => {
     try {
@@ -80,7 +84,7 @@ export function ProjectDetailsDialog({ project, onClose, onRestored }: Props) {
           <dl className="grid grid-cols-2 gap-2 rounded-lg bg-ink-850 p-3 text-xs">
             <dt className="text-ink-400">Criado em</dt><dd>{fmtDate(project.createdAt)}</dd>
             <dt className="text-ink-400">Última modificação</dt><dd>{fmtDate(project.updatedAt)}</dd>
-            <dt className="text-ink-400">Armazenamento</dt><dd>Local (IndexedDB neste dispositivo)</dd>
+            <dt className="text-ink-400">Armazenamento</dt><dd>{synced ? 'Local + nuvem (Supabase)' : 'Local (IndexedDB neste dispositivo)'}</dd>
             <dt className="text-ink-400">Tamanho aproximado</dt><dd>{size === undefined ? '…' : formatBytes(size)}</dd>
           </dl>
           <div className="flex justify-end"><button className="btn-primary" onClick={saveInfo}>Salvar informações</button></div>

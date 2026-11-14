@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { commit, createHistory, redo, replace, undo, type HistoryState } from '@/core/history/history';
+import { registerSyncHooks } from '@/core/cloud/hooks';
 import { createVersion, getDocument, saveModuleData, updateProjectMeta } from '@/core/projects/projectService';
+import { toast } from '@/ui/toast';
 import { useSettings } from '@/core/settings/settings';
 import { debounce, type Debounced } from '@/core/utils/debounce';
 import { projectScreen, writeBack } from './breakpoints';
@@ -236,6 +238,22 @@ export const useWebDesign = create<WebDesignState>((set, get) => {
       set({ history: createHistory(wd), activeScreenId: wd.screens[0].id, activeBreakpoint: null, selection: [] });
     },
   };
+});
+
+// ---------- cloud sync integration ----------
+
+registerSyncHooks({
+  // The engine must see the latest edits.
+  beforeSync: async () => {
+    if (useWebDesign.getState().projectId) await useWebDesign.getState().saveNow();
+  },
+  // The open project changed in the cloud: reload it (local edits were flushed before syncing).
+  onPulled: (kind, id, deleted) => {
+    const st = useWebDesign.getState();
+    if (kind !== 'project' || st.projectId !== id || deleted) return;
+    saver?.cancel();
+    void st.load(id).then(() => toast.info('Projeto atualizado com alterações vindas de outro dispositivo.'));
+  },
 });
 
 // ---------- selectors ----------

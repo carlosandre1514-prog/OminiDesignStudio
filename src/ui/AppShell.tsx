@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from 'react';
-import { NavLink, Outlet } from 'react-router-dom';
+import { Link, NavLink, Outlet } from 'react-router-dom';
+import { useCloud } from '@/core/cloud/cloudStore';
 import { listModules } from '@/core/modules/registry';
 import { useOnline } from '@/hooks/useOnline';
 
@@ -10,6 +11,7 @@ const NAV = [
   { to: '/templates', label: 'Modelos', icon: '❏' },
   { to: '/history', label: 'Histórico', icon: '↺' },
   { to: '/storage', label: 'Armazenamento', icon: '⛁' },
+  { to: '/account', label: 'Conta e nuvem', icon: '☁' },
   { to: '/settings', label: 'Configurações', icon: '⚙' },
 ];
 
@@ -29,18 +31,35 @@ function NavItem({ to, end, icon, children, onClick }: { to: string; end?: boole
   );
 }
 
+const SYNC_DOT: Record<string, string> = {
+  idle: 'bg-emerald-400',
+  syncing: 'bg-cyan-400 animate-pulse',
+  error: 'bg-red-500',
+  offline: 'bg-amber-400',
+  'needs-consent': 'bg-amber-400',
+};
+
 export function StatusIndicators() {
   const online = useOnline();
+  const cloud = useCloud();
+  let syncText = 'Sincronização: somente local';
+  if (cloud.status === 'unconfigured') syncText = 'Nuvem: não configurada';
+  else if (cloud.status === 'signed-out') syncText = 'Nuvem: não conectado';
+  else if (cloud.status === 'needs-consent') syncText = 'Nuvem: confirme o envio';
+  else if (cloud.status === 'syncing') syncText = 'Sincronizando…';
+  else if (cloud.status === 'error') syncText = 'Erro de sincronização';
+  else if (cloud.status === 'offline') syncText = `Offline · ${cloud.pending} pendente(s)`;
+  else if (cloud.status === 'idle') syncText = cloud.conflicts.length ? `${cloud.conflicts.length} conflito(s)` : cloud.pending ? `${cloud.pending} alteração(ões) pendente(s)` : 'Sincronizado';
   return (
     <div className="space-y-1.5 text-xs">
       <div className="flex items-center gap-2" title={online ? 'Conectado à internet' : 'Sem conexão: tudo continua funcionando localmente'}>
         <span className={`h-2 w-2 rounded-full ${online ? 'bg-emerald-400' : 'bg-amber-400'}`} />
         <span className="text-ink-300">{online ? 'Online' : 'Offline — modo local'}</span>
       </div>
-      <div className="flex items-center gap-2" title="A sincronização em nuvem será adicionada na Fase 6. Todos os dados estão salvos neste dispositivo.">
-        <span className="h-2 w-2 rounded-full bg-ink-600" />
-        <span className="text-ink-400">Sincronização: somente local</span>
-      </div>
+      <Link to="/account" className="flex items-center gap-2 hover:underline" title={cloud.user?.email ?? 'Conta e sincronização em nuvem'} data-testid="sync-indicator">
+        <span className={`h-2 w-2 rounded-full ${SYNC_DOT[cloud.status] ?? 'bg-ink-600'} ${cloud.conflicts.length ? '!bg-amber-400' : ''}`} />
+        <span className="text-ink-400">{syncText}</span>
+      </Link>
     </div>
   );
 }
