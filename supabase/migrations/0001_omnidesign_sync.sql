@@ -65,11 +65,11 @@ drop policy if exists "omni_records_update_own" on public.omni_records;
 drop policy if exists "omni_records_delete_own" on public.omni_records;
 
 create policy "omni_records_select_own" on public.omni_records
-  for select to authenticated using (owner = auth.uid());
+  for select to authenticated using (owner = (select auth.uid()));
 create policy "omni_records_insert_own" on public.omni_records
-  for insert to authenticated with check (owner = auth.uid());
+  for insert to authenticated with check (owner = (select auth.uid()));
 create policy "omni_records_update_own" on public.omni_records
-  for update to authenticated using (owner = auth.uid()) with check (owner = auth.uid());
+  for update to authenticated using (owner = (select auth.uid())) with check (owner = (select auth.uid()));
 -- Sem política de DELETE: exclusões viram "lápides" (deleted = true) para propagar entre dispositivos.
 
 revoke all on public.omni_records from anon;
@@ -92,11 +92,11 @@ drop policy if exists "omni_assets_delete_own" on storage.objects;
 
 create policy "omni_assets_select_own" on storage.objects
   for select to authenticated
-  using (bucket_id = 'omni-assets' and (storage.foldername(name))[1] = auth.uid()::text);
+  using (bucket_id = 'omni-assets' and (storage.foldername(name))[1] = (select auth.uid())::text);
 create policy "omni_assets_insert_own" on storage.objects
   for insert to authenticated
   with check (
     bucket_id = 'omni-assets'
-    and (storage.foldername(name))[1] = auth.uid()::text
-    and name ~ ('^' || auth.uid()::text || '/(blobs/[0-9a-f]{64}|payloads/[0-9a-f]{64}\.json)$')
+    and (storage.foldername(name))[1] = (select auth.uid())::text
+    and name ~ ('^' || (select auth.uid())::text || '/(blobs/[0-9a-f]{64}|payloads/[0-9a-f]{64}\.json)$')
   );
