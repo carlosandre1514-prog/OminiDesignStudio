@@ -81,6 +81,11 @@ export function authMessage(e: unknown): string {
   return msg;
 }
 
+/** Where e-mail links (confirmation, password reset) bring the user back: the app's account page. */
+export function accountUrl(): string {
+  return new URL('account', `${location.origin}${import.meta.env.BASE_URL}`).href;
+}
+
 let unsubAuth: (() => void) | null = null;
 let timer: ReturnType<typeof setInterval> | null = null;
 let listenersInstalled = false;
@@ -234,7 +239,7 @@ export const useCloud = create<CloudState>((set, get) => {
 
     async signUp(email, password) {
       const sb = await client();
-      const { data, error } = await sb.auth.signUp({ email: email.trim(), password, options: { emailRedirectTo: `${location.origin}/account` } });
+      const { data, error } = await sb.auth.signUp({ email: email.trim(), password, options: { emailRedirectTo: accountUrl() } });
       if (error) throw new Error(authMessage(error));
       return !data.session;
     },
@@ -256,7 +261,7 @@ export const useCloud = create<CloudState>((set, get) => {
 
     async resetPassword(email) {
       const sb = await client();
-      const { error } = await sb.auth.resetPasswordForEmail(email.trim(), { redirectTo: `${location.origin}/account` });
+      const { error } = await sb.auth.resetPasswordForEmail(email.trim(), { redirectTo: accountUrl() });
       if (error) throw new Error(authMessage(error));
     },
 
@@ -271,7 +276,7 @@ export const useCloud = create<CloudState>((set, get) => {
       const email = get().user?.email;
       if (!email) return;
       const sb = await client();
-      const { error } = await sb.auth.resend({ type: 'signup', email, options: { emailRedirectTo: `${location.origin}/account` } });
+      const { error } = await sb.auth.resend({ type: 'signup', email, options: { emailRedirectTo: accountUrl() } });
       if (error) throw new Error(authMessage(error));
     },
 

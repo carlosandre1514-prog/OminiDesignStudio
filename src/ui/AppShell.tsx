@@ -71,7 +71,7 @@ export function AppShell() {
   const sidebar = (
     <aside className="flex h-full w-64 flex-col border-r border-ink-800 bg-ink-900">
       <div className="flex items-center gap-2.5 px-4 py-4">
-        <img src="/icon.svg" alt="" className="h-8 w-8" />
+        <img src={`${import.meta.env.BASE_URL}icon.svg`} alt="" className="h-8 w-8" />
         <div>
           <div className="text-sm font-semibold tracking-tight">OmniDesign Studio</div>
           <div className="text-[11px] text-ink-400">Estúdio universal de criação</div>

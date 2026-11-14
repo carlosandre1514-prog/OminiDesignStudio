@@ -4,6 +4,8 @@ Plataforma universal de criação digital (Web App/PWA, futuramente Android/iOS 
 
 > Status atual: **Fases 1 (Fundação), 2 (Web & App Design) e 3 (Asset Library) entregues, além de login e sincronização em nuvem (Supabase).** Veja [`DEVELOPMENT_STATUS.md`](DEVELOPMENT_STATUS.md) para o que está pronto, pendente e testado.
 
+**App publicado:** https://carlosandre1514-prog.github.io/OminiDesignStudio/ (GitHub Pages, atualizado a cada push).
+
 ## Executar
 
 ```bash
@@ -14,6 +16,17 @@ npm run preview      # serve o build
 npm test             # testes unitários/integrados (Vitest + fake-indexeddb)
 npm run test:sql     # script SQL do Supabase num PostgreSQL 16 local (RLS, revisões)
 npm run test:e2e     # testes E2E com Playwright (requer `npm run build && npm run preview -- --port 4173` em outro terminal)
+```
+
+## Publicação (GitHub Pages)
+
+O workflow [`.github/workflows/pages.yml`](.github/workflows/pages.yml) roda os testes, gera o build em
+`/<repositório>/` (com o Supabase do projeto já configurado) e publica no GitHub Pages a cada push.
+Rotas diretas (ex.: `/projects`) funcionam via `404.html`. Para testar localmente como no Pages:
+
+```bash
+BASE_PATH=/OminiDesignStudio/ npm run build:pages
+node e2e/pages-server.mjs   # http://localhost:4175/OminiDesignStudio/
 ```
 
 ## Stack

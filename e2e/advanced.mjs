@@ -23,7 +23,9 @@ const until = async (fn, timeout = 5000) => {
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
 page.on('pageerror', (e) => errors.push(e.message));
-page.on('console', (m) => m.type() === 'error' && !/Failed to load resource|decode|OTS|font/i.test(m.text()) && errors.push(m.text()));
+// On GitHub Pages, deep links are served by 404.html with HTTP 404 (cosmetic): ignored when PAGES_SIM=1.
+const pagesNoise = (t) => !!process.env.PAGES_SIM && /status of 404/.test(t);
+page.on('console', (m) => m.type() === 'error' && !pagesNoise(m.text()) && !/Failed to load resource|decode|OTS|font/i.test(m.text()) && errors.push(m.text()));
 page.on('dialog', (d) => (d.type() === 'prompt' ? d.accept('Cartão E2E') : d.accept()));
 
 await page.goto(BASE);

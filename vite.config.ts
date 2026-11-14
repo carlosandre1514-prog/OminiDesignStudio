@@ -5,6 +5,8 @@ import tailwindcss from '@tailwindcss/vite';
 import { fileURLToPath, URL } from 'node:url';
 
 export default defineConfig({
+  // GitHub Pages serves the app under /<repo>/ (BASE_PATH is set by the deploy workflow).
+  base: process.env.BASE_PATH || '/',
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },

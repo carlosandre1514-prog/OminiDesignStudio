@@ -26,7 +26,7 @@ export default function App() {
   }, [settings.reduceMotion]);
 
   return (
-    <BrowserRouter>
+    <BrowserRouter basename={import.meta.env.BASE_URL.replace(/\/$/, '') || undefined}>
       <ErrorBoundary>
         <Suspense fallback={<div className="p-8 text-sm text-ink-400">Carregando…</div>}>
           <Routes>

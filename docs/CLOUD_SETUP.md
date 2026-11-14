@@ -13,7 +13,7 @@ projetos, assets (com os arquivos), pastas da biblioteca e versões entre dispos
 3. Em **Authentication → Sign In / Providers**, mantenha **Email** habilitado.
    - Com "Confirm email" ligado, o usuário confirma o e-mail antes do primeiro login (recomendado).
 4. Em **Authentication → URL Configuration**, defina a *Site URL* e adicione as *Redirect URLs* onde o app roda
-   (ex.: `https://seu-dominio/account` e `http://localhost:5173/account`). Elas são usadas na confirmação de e-mail e na redefinição de senha.
+   (ex.: `https://carlosandre1514-prog.github.io/OminiDesignStudio/account` e `http://localhost:5173/account`). Elas são usadas na confirmação de e-mail e na redefinição de senha.
 
 ## 2. Conectar o app
 - **Pela interface:** abra **Conta e nuvem**, cole a *Project URL* e a chave **anon / publishable**

@@ -71,6 +71,11 @@ _Última atualização: 2026-11-14 (login e sincronização em nuvem)_
 - Indicadores na barra lateral (sincronizado, pendências, conflitos, offline, erro) e local de armazenamento "Local + nuvem" nos detalhes do projeto.
 - Script SQL do Supabase (`supabase/migrations/0001_omnidesign_sync.sql`) com RLS, gatilho de revisão, sem exclusão física, bucket privado com arquivos imutáveis. Guia em `docs/CLOUD_SETUP.md`.
 
+### ✅ Publicação
+- GitHub Pages via GitHub Actions (`.github/workflows/pages.yml`): testes + build no subcaminho `/OminiDesignStudio/` + deploy a cada push. Supabase do projeto configurado no build.
+- App preparado para subcaminho: rotas (`basename`), service worker e manifest com escopo relativo, ícones, links de e-mail do Supabase apontando para `<base>/account`, `404.html` para links diretos.
+- Verificado com um servidor que simula o Pages (`e2e/pages-server.mjs`): suítes smoke, assets e avançada passando; tela de conta com Supabase pré-configurado; service worker no escopo correto.
+
 ## Fases em andamento
 Nenhuma. Próxima: **Fase 4 — 3D Design Studio**.
 
