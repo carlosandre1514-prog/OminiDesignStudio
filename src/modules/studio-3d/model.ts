@@ -49,7 +49,8 @@ export interface Obj3D {
   scale: Vec3;
   geometry?: GeometrySource;
   materialId?: string;
-  shading: 'flat' | 'smooth';
+  /** flat = faceted, smooth = all averaged, auto = smooth below 35° (keeps hard edges). */
+  shading: 'flat' | 'smooth' | 'auto';
   uv: UVProjection;
   modifiers: Modifiers;
   castShadow: boolean;
@@ -338,7 +339,7 @@ export function normalizeScene(raw: unknown): Scene3DDoc {
         rotation: isVec3(o.rotation) ? o.rotation : [0, 0, 0],
         scale: isVec3(o.scale) ? o.scale : [1, 1, 1],
         uv: UVS.includes(o.uv) ? o.uv : 'box',
-        shading: o.shading === 'smooth' ? 'smooth' : 'flat',
+        shading: o.shading === 'smooth' || o.shading === 'auto' ? o.shading : 'flat',
         modifiers: { ...defaultModifiers(), ...(o.modifiers ?? {}), subdivision: num(o.modifiers?.subdivision, 0, 0, 4) },
         materialId: o.materialId && matIds.has(o.materialId) ? o.materialId : undefined,
       };

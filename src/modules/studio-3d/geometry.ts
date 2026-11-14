@@ -64,8 +64,10 @@ function projectUV(p: P.Vec3, n: P.Vec3, mode: UVProjection): [number, number] {
   }
 }
 
+export const AUTO_SMOOTH_DEG = 35;
+
 export interface BuildOptions {
-  shading: 'flat' | 'smooth';
+  shading: 'flat' | 'smooth' | 'auto';
   uv: UVProjection;
 }
 
@@ -86,13 +88,31 @@ export function toBufferGeometry(m: P.PolyMesh, opts: BuildOptions): THREE.Buffe
     m.f.forEach((f, fi) => f.forEach((i) => (vn![i] = P.add(vn![i], faceN[fi]))));
     vn = vn.map((n) => P.normalize(n));
   }
+  // Auto smooth: per face corner, average only the neighbouring faces within the angle threshold.
+  let vertFaces: number[][] | null = null;
+  const cosT = Math.cos((AUTO_SMOOTH_DEG * Math.PI) / 180);
+  if (opts.shading === 'auto') {
+    vertFaces = Array.from({ length: P.vcount(m) }, () => []);
+    m.f.forEach((f, fi) => f.forEach((i) => vertFaces![i].push(fi)));
+  }
+  const cornerNormal = (vi: number, fi: number): P.Vec3 => {
+    if (vn) return vn[vi];
+    if (!vertFaces) return faceN[fi];
+    const own = faceN[fi];
+    let s: P.Vec3 = [0, 0, 0];
+    for (const g of vertFaces[vi]) {
+      const n = faceN[g];
+      if (n[0] * own[0] + n[1] * own[1] + n[2] * own[2] >= cosT) s = P.add(s, n);
+    }
+    return P.normalize(s);
+  };
   let t = 0;
   m.f.forEach((face, fi) => {
     for (let k = 1; k < face.length - 1; k++) {
       const corners = [face[0], face[k], face[k + 1]];
       corners.forEach((vi, c) => {
         const p = P.vget(m, vi);
-        const n = vn ? vn[vi] : faceN[fi];
+        const n = cornerNormal(vi, fi);
         pos.set(p, t * 9 + c * 3);
         nor.set(n, t * 9 + c * 3);
         uv.set(projectUV(p, faceN[fi], opts.uv), t * 6 + c * 2);

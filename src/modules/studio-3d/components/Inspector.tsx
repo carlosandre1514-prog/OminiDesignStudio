@@ -247,6 +247,7 @@ function GeometrySection({ o }: { o: Obj3D }) {
         <select className="input py-1 text-xs" aria-label="Sombreamento" value={o.shading} onChange={(e) => upd(o.id, () => ({ shading: e.target.value as Obj3D['shading'] }))}>
           <option value="flat">Facetado</option>
           <option value="smooth">Suave</option>
+          <option value="auto">Suavização automática</option>
         </select>
         <select className="input py-1 text-xs" aria-label="Projeção UV" value={o.uv} onChange={(e) => upd(o.id, () => ({ uv: e.target.value as UVProjection }))}>
           <option value="box">UV: caixa</option>
