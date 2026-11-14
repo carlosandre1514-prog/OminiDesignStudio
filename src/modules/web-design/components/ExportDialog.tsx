@@ -4,7 +4,8 @@ import { slugify } from '@/core/utils/sanitize';
 import { Modal } from '@/ui/Modal';
 import { toast } from '@/ui/toast';
 import { collectExportAssets, docAssetIds, withAssetUrls, type ExportAssets } from '../export/assets';
-import { exportHtmlProject } from '../export/html';
+import { exportHtmlProject, type ExportOptions } from '../export/html';
+import { loadIcons } from '../icons';
 import { exportReactProject } from '../export/react';
 import { zipFiles } from '../export/zip';
 import type { WebDesignDoc } from '../model';
@@ -13,7 +14,12 @@ type Format = 'html' | 'react' | 'react-tailwind';
 
 export function ExportDialog({ doc, projectName, onClose }: { doc: WebDesignDoc; projectName: string; onClose: () => void }) {
   const [format, setFormat] = useState<Format>('html');
-  const [assets, setAssets] = useState<ExportAssets | null>(docAssetIds(doc).length ? null : { files: {}, paths: new Map(), missing: [] });
+  const usesIcons = doc.screens.concat(doc.components).some((f) => f.elements.some((e) => e.type === 'icon' && e.iconName));
+  const [iconsReady, setIconsReady] = useState(!usesIcons);
+  useEffect(() => {
+    if (usesIcons) void loadIcons().then(() => setIconsReady(true));
+  }, [usesIcons]);
+  const [assets, setAssets] = useState<ExportAssets | null>(docAssetIds(doc).length ? null : { files: {}, paths: new Map(), fontFormats: new Map(), missing: [] });
   const assetDir = format === 'html' ? 'assets' : 'public/assets';
   useEffect(() => {
     if (!docAssetIds(doc).length) return;
@@ -28,13 +34,21 @@ export function ExportDialog({ doc, projectName, onClose }: { doc: WebDesignDoc;
   }, [doc, assetDir]);
   const files = useMemo(() => {
     // Library images become files inside the export; HTML uses relative paths, Vite serves public/ at the root.
-    const resolved = withAssetUrls(doc, (id) => {
+    const urlOf = (id: string) => {
       const p = assets?.paths.get(id);
       if (!p) return undefined;
       return format === 'html' ? `./${p}` : `/${p.replace(/^public\//, '')}`;
-    });
-    return format === 'html' ? exportHtmlProject(resolved) : exportReactProject(resolved, { tailwind: format === 'react-tailwind' }, projectName);
-  }, [doc, format, projectName, assets]);
+    };
+    const resolved = withAssetUrls(doc, urlOf);
+    const opts: ExportOptions = { fonts: {} };
+    for (const [id, fmt] of assets?.fontFormats ?? []) {
+      const url = urlOf(id);
+      // styles.css sits next to index.html (HTML) — in React, public files are served from the site root.
+      if (url) opts.fonts![id] = { url, format: fmt };
+    }
+    void iconsReady; // recompute once icons are available
+    return format === 'html' ? exportHtmlProject(resolved, opts) : exportReactProject(resolved, { ...opts, tailwind: format === 'react-tailwind' }, projectName);
+  }, [doc, format, projectName, assets, iconsReady]);
   const binaryNames = Object.keys(assets?.files ?? {});
   const names = [...Object.keys(files), ...binaryNames];
   const [file, setFile] = useState<string>('');
@@ -61,7 +75,7 @@ export function ExportDialog({ doc, projectName, onClose }: { doc: WebDesignDoc;
         <>
           <button className="btn-ghost" disabled={files[current] === undefined} onClick={() => downloadText(files[current], current.split('/').pop()!)}>Baixar arquivo atual</button>
           <button className="btn-ghost" disabled={files[current] === undefined} onClick={() => navigator.clipboard?.writeText(files[current]).then(() => toast.success('Copiado'))}>Copiar</button>
-          <button className="btn-primary" disabled={!assets} onClick={zip}>{assets ? 'Baixar projeto (.zip)' : 'Preparando assets…'}</button>
+          <button className="btn-primary" disabled={!assets || !iconsReady} onClick={zip}>{assets && iconsReady ? 'Baixar projeto (.zip)' : 'Preparando assets…'}</button>
         </>
       }
     >

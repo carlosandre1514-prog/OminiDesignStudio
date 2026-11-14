@@ -1,6 +1,6 @@
 # DEVELOPMENT_STATUS
 
-_Última atualização: 2026-11-14 (Fase 3)_
+_Última atualização: 2026-11-14 (pendências das Fases 1–3)_
 
 ## Fases concluídas
 
@@ -42,34 +42,52 @@ _Última atualização: 2026-11-14 (Fase 3)_
 - Integração com o Web Design: "Escolher da biblioteca" e "Enviar imagem" (que importa para a biblioteca) no elemento Imagem; referências `asset:<id>` resolvidas no canvas e no protótipo; aviso visual de asset ausente; exportação HTML/React inclui os arquivos (`assets/` ou `public/assets/`).
 - Dashboard e Armazenamento exibem estatísticas da biblioteca (incluindo economia por deduplicação).
 
+### ✅ Pendências das Fases 1–3 concluídas
+- **Ajustes manuais por breakpoint**: breakpoints configuráveis por projeto (até / a partir de uma largura, largura de edição), padrão desktop-first para designs largos e mobile-first para designs estreitos. No modo breakpoint o canvas mostra a tela na largura do breakpoint; mover, redimensionar, ocultar e mudar o tamanho da fonte gravam ajustes daquele breakpoint sem alterar a base; demais propriedades continuam compartilhadas. Indicação e "Limpar ajustes" por elemento. Exportado como `@media` (HTML/React) e variantes `max-[..]:`/`min-[..]:` (Tailwind), na mesma ordem de cascata usada pela pré-visualização.
+- **Rotação**: campo R° e alça de giro no canvas (Shift = passos de 15°), seleção/alças rotacionadas, clique e redimensionamento corretos em elementos girados (o canto oposto fica fixo), miniatura e exportação (`transform: rotate`).
+- **Componentes reutilizáveis**: criar componente a partir da seleção (Ctrl+Alt+K), mestre editável como um quadro próprio, instâncias que refletem o mestre e se redimensionam pelas constraints, textos sobrescritos por instância, desvincular instância, excluir componente sem perder conteúdo (instâncias viram elementos), proteção contra ciclos, componentes aninhados. Exportação gera a estrutura aninhada.
+- **Componentes como asset**: "Salvar na Asset Library" gera um arquivo `.omnicomp` (com dependências e miniatura) e "Da biblioteca…" insere em qualquer projeto.
+- **Transições animadas**: dissolver, deslizar (4 direções) e zoom, com duração, para navegação entre telas e para elementos que aparecem (mostrar/ocultar). Funcionam no protótipo e no código exportado (HTML via `sessionStorage` + keyframes, React via estado), respeitando "reduzir animações".
+- **Biblioteca de ícones**: 1799 ícones Lucide (licença ISC) com busca, carregados sob demanda; renderizados como SVG que herda a cor do texto; exportados inline em HTML/JSX. Marcação gerada a partir de dados vetoriais com atributos em lista branca.
+- **Estados**: hover, pressionado (`:active`) e foco (`:focus-within`), além de desabilitado (sem interações, opacidade reduzida, atributo `disabled` nativo).
+- **Fontes da biblioteca no Web Design**: seletor de fonte lista as fontes da Asset Library (e permite importar), o canvas as carrega via FontFace e a exportação inclui os arquivos com `@font-face`.
+- **Configurações aplicadas na hora**: intervalo de versão automática e atraso do salvamento automático passam a valer imediatamente no projeto aberto (antes só no próximo projeto).
+
 ## Fases em andamento
 Nenhuma. Próxima: **Fase 4 — 3D Design Studio**.
 
 ## Funcionalidades pendentes (conhecidas)
-- Fase 2: ajustes manuais por breakpoint (overrides de posição/tamanho por dispositivo); rotação de elementos; biblioteca de componentes reutilizáveis (componentes mestre/instâncias); transições animadas entre telas no protótipo; biblioteca de ícones (o elemento ícone usa um glifo de texto); variantes de estado além de hover (pressed/disabled).
-- Fase 1: autenticação e sincronização em nuvem (Fase 6).
-- Fase 3: fontes da biblioteca ainda não aparecem como opção de fonte no Web Design; visualização de modelos 3D (Fase 4); geração de miniatura para modelos 3D (Fase 4); materiais/prefabs/componentes como tipos próprios de asset (hoje são categorias de organização).
-- Fases 3 a 7 conforme o roadmap (Asset Library, 3D Studio, Game Design Studio, sistemas avançados, app nativo via Capacitor).
+Itens que dependem de fases futuras (não são pendências das fases entregues):
+- Visualização e miniatura de modelos 3D da biblioteca — chega com o viewport 3D (Fase 4).
+- Materiais como tipo de asset — depende do editor PBR (Fase 4); prefabs — dependem do editor de jogos (Fase 5). Hoje são categorias de organização.
+- Autenticação e sincronização em nuvem — Fase 6; requer um projeto Supabase/Firebase e credenciais do proprietário.
+
+Limitações conscientes:
+- A interação "mostrar/ocultar" fica disponível apenas em telas (não dentro de componentes mestres), pois os alvos pertencem à tela.
+- Ajustes por breakpoint valem para telas; dentro de componentes o layout segue as constraints (ao criar um componente, ajustes existentes são descartados após confirmação).
 
 ## Erros conhecidos
 - Nenhum erro crítico conhecido.
-- O ponto de restauração automático usa o intervalo vigente ao abrir o projeto; alterar a configuração vale a partir do próximo projeto aberto.
 - Tamanho de projeto exibido é aproximado (tamanho do JSON serializado).
 
 ## Testes realizados
-- `npm test` — 48 testes (Vitest, IndexedDB simulado por fake-indexeddb):
+- `npm test` — 62 testes (Vitest, IndexedDB simulado por fake-indexeddb):
   - histórico (commit/undo/redo/gestos/limite);
   - serviço de projetos (CRUD, favoritos, duplicação profunda, versões, restauração não destrutiva, poda de versões automáticas, export/import `.omni`, validação de arquivos corrompidos, exclusão em cascata);
   - operações do editor (mover, grupos, redimensionar grupos, exclusão em cascata, duplicação com remapeamento, ordem Z, alinhar/distribuir, smart snap, telas, normalização de dados corrompidos);
   - layout responsivo e exportadores (HTML escapado e sem URLs inseguras, React, Tailwind, ZIP);
   - store do editor (persistência, undo/redo, gesto único, copiar/colar, recuperação após reinício);
   - Asset Library (validação por conteúdo de todos os formatos, limites, deduplicação, duplicação com bytes compartilhados e coleta de lixo, tags/filtros/busca, pastas sem perda de conteúdo, vínculo e desvinculação ao excluir projeto, exportação/importação ZIP);
+  - geometria (rotação, AABB, clique em elementos girados, redimensionamento girado com canto fixo, equivalência entre constraints numéricas e CSS);
+  - breakpoints (ordem de cascata, projeção memorizada, gravação de ajustes sem alterar a base, visibilidade, fonte, limpeza, store com desfazer);
+  - componentes (criação a partir da seleção, ciclos, desvincular com textos sobrescritos, exclusão sem perda, normalização, publicação/leitura na biblioteca);
+  - exportação avançada (rotação, `:active`, `:focus-within`, desabilitado, ícones SVG, `@media` na ordem correta, instâncias aninhadas, transições, `@font-face`, variantes Tailwind);
   - pacotes de projeto (busca/reescrita de referências, ida e volta em biblioteca vazia com remapeamento inclusive nas versões, reaproveitamento, dependências ausentes, ZIP inválido).
 - `npm run test:e2e` — fluxo completo no navegador (Chromium): criar projeto por modelo, inserir, arrastar, desfazer/refazer, editar texto, protótipo com navegação e modal, troca de dispositivo, exportação, persistência após recarregar, dashboard, indicador offline, layout mobile sem rolagem horizontal, ausência de erros no console. ✅
 - `e2e/assets.mjs` — importação (válidos, inválido rejeitado, duplicado reaproveitado), renomear/tag/filtro, pastas, imagem da biblioteca no canvas, exportação HTML com o arquivo do asset, aba do projeto, exportação e reimportação do pacote do projeto. ✅
+- `e2e/advanced.mjs` — rotação (campo e alça), estado pressionado, desabilitado, ícone da biblioteca, transição animada, ajuste por breakpoint preservando a base e aplicado na pré-visualização de celular, criação de componente e propagação do mestre para instâncias, componente salvo na biblioteca, fonte da biblioteca, CSS exportado. ✅
 - Verificação manual: os projetos React e React+Tailwind exportados passam em `tsc` e `vite build` e executam o protótipo (navegação + modal) corretamente.
 
 ## Próximas tarefas
 1. Fase 4 — 3D Design Studio: viewport (Three.js/R3F, carregado sob demanda), primitivas, transformações, modo de edição, materiais PBR com texturas da biblioteca, iluminação, importação GLB/GLTF/OBJ/FBX/STL a partir da biblioteca e exportação GLB/GLTF/OBJ/STL/PNG.
-2. Fontes da biblioteca no Web Design.
-3. Pendências da Fase 2 listadas acima.
+2. Fase 5 — Game Design Studio (GDD, editor 2D, tilemaps, spritesheets, lógica por nodes).

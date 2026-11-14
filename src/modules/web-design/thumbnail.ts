@@ -4,7 +4,7 @@ import type { WDScreen } from './model';
 
 /** Render a lightweight raster thumbnail of a screen (boxes, colours and text). */
 export function renderScreenThumbnail(screen: WDScreen, width = 320): string | undefined {
-  if (typeof document === 'undefined') return undefined;
+  if (typeof document === 'undefined' || /jsdom/i.test(navigator.userAgent)) return undefined;
   const scale = width / screen.width;
   const height = Math.max(1, Math.round(Math.min(screen.height, screen.width * 0.75) * scale));
   const canvas = document.createElement('canvas');
@@ -23,7 +23,12 @@ export function renderScreenThumbnail(screen: WDScreen, width = 320): string | u
   for (const el of renderableElements(screen)) {
     if (el.initiallyHidden) continue;
     ctx.save();
-    ctx.globalAlpha = el.style.opacity;
+    ctx.globalAlpha = el.style.opacity * (el.disabled ? 0.5 : 1);
+    if (el.rotation) {
+      ctx.translate(el.x + el.w / 2, el.y + el.h / 2);
+      ctx.rotate((el.rotation * Math.PI) / 180);
+      ctx.translate(-(el.x + el.w / 2), -(el.y + el.h / 2));
+    }
     const r = el.type === 'ellipse' ? Math.min(el.w, el.h) / 2 : Math.min(el.style.borderRadius, el.w / 2, el.h / 2);
     ctx.beginPath();
     if (el.type === 'ellipse') ctx.ellipse(el.x + el.w / 2, el.y + el.h / 2, el.w / 2, el.h / 2, 0, 0, Math.PI * 2);

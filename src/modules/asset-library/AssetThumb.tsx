@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { ensureAssetFont } from '@/core/assets/assetUrls';
 import type { Asset } from '@/core/assets/types';
 
-const ICON: Record<Asset['kind'], string> = { image: '🖼', vector: '◇', audio: '♪', font: 'Aa', model3d: '◈' };
+const ICON: Record<Asset['kind'], string> = { image: '🖼', vector: '◇', audio: '♪', font: 'Aa', model3d: '◈', component: '◆' };
 
 export function FontSample({ id, text = 'Aa', className }: { id: string; text?: string; className?: string }) {
   const [family, setFamily] = useState<string | null>(null);

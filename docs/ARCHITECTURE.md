@@ -35,3 +35,9 @@
 - **ArrayBuffer em vez de Blob** no IndexedDB, por compatibilidade (Safari antigo e ambientes de teste).
 - **Referências `asset:<id>`** dentro dos documentos dos módulos. A UI resolve para object URLs (cache em `assetUrls.ts`); exportadores substituem por caminhos de arquivo empacotados. Pacotes de projeto remapeiam ids ao importar (`projectPackage.ts`) e listam dependências ausentes.
 - **Validação dupla**: extensão suportada + assinatura/estrutura do conteúdo (`formats.ts`). Nada importado é executado; SVG só é exibido via `<img>`.
+
+## Breakpoints, componentes e renderização compartilhada
+- **Breakpoints por projeção**: `projectScreen()` gera (e memoriza por identidade) a tela vista na largura de um breakpoint; o store aplica as edições sobre essa projeção e `writeBack()` converte diferenças de geometria/visibilidade/fonte em `overrides[bp]`, mantendo o resto na base. Assim todas as ferramentas do canvas funcionam sem conhecer breakpoints.
+- **Uma regra de layout, duas formas**: `resolveConstraintBox()` (números, usada no canvas/pré-visualização/instâncias) espelha `boxCss()` (CSS exportado); há teste de equivalência. A cascata de breakpoints (`cascadeOrder`) é a mesma nos dois lados.
+- **Árvore de renderização** (`export/tree.ts`): exportadores HTML, React e Tailwind consomem os mesmos nós (CSS base, estados, media queries, filhos de instância), evitando divergências.
+- **Componentes** são quadros (`WDComponent` = mesma forma de uma tela) guardados em `doc.components`; instâncias referenciam o mestre por id e renderizam os filhos pelas constraints. Ícones são dados vetoriais Lucide carregados sob demanda.

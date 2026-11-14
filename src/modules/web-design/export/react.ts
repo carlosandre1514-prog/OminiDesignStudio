@@ -1,10 +1,11 @@
 import { safeColor, safeUrl, toComponentName } from '@/core/utils/sanitize';
-import { boxCss, cssToReact, hoverCss, renderableElements, visualCss, type CssMap } from '../layout';
+import { cssToReact, type CssMap } from '../layout';
 import type { WDElement, WDScreen, WebDesignDoc } from '../model';
 import { innerJsx, rootTag } from './content';
-import { buildCss, cls, screenCls, type FileMap } from './html';
+import { buildCss, fontFaceCss, nodeCls, screenCls, type ExportOptions, type FileMap } from './html';
+import { animationValue, buildRenderTree, keyframesCss, type RenderNode } from './tree';
 
-export interface ReactExportOptions {
+export interface ReactExportOptions extends ExportOptions {
   /** Use Tailwind utility classes instead of a generated stylesheet. */
   tailwind: boolean;
 }
@@ -32,11 +33,21 @@ export function cssToTailwind(css: CssMap, variant = ''): string[] {
   });
 }
 
+const TW_STATE = { hover: 'hover:', pressed: 'active:', focus: 'focus-within:' } as const;
+
+export function nodeTailwind(n: RenderNode): string[] {
+  const out = cssToTailwind(n.css);
+  for (const [st, css] of Object.entries(n.states)) out.push(...cssToTailwind(css!, TW_STATE[st as keyof typeof TW_STATE]));
+  for (const m of n.media) out.push(...cssToTailwind(m.css, `${m.minOrMax}-[${m.width}px]:`));
+  return out;
+}
+
 function interactionProp(el: WDElement, screenNames: Map<string, string>): string {
   const i = el.interaction;
-  if (!i) return '';
-  if (i.type === 'navigate' && screenNames.has(i.screenId)) return ` onClick={() => onNavigate(${JSON.stringify(screenNames.get(i.screenId))})}`;
-  if (i.type === 'toggle') return ` onClick={() => onToggle(${JSON.stringify(i.targetId)})}`;
+  if (!i || el.disabled) return '';
+  if (i.type === 'navigate' && screenNames.has(i.screenId))
+    return ` onClick={() => onNavigate(${JSON.stringify(screenNames.get(i.screenId))}, ${JSON.stringify(animationValue(i.transition, i.duration))})}`;
+  if (i.type === 'toggle') return ` onClick={() => onToggle(${JSON.stringify(i.targetId)}, ${JSON.stringify(animationValue(i.transition, i.duration))})}`;
   if (i.type === 'url') {
     const href = safeUrl(i.href);
     return href ? ` onClick={() => window.open(${JSON.stringify(href)}, '_blank', 'noopener')}` : '';
@@ -58,35 +69,46 @@ export function componentNames(doc: WebDesignDoc): Map<string, string> {
   return map;
 }
 
-export function buildScreenComponent(screen: WDScreen, names: Map<string, string>, opts: ReactExportOptions): string {
+const tpl = (s: string) => s.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$\{/g, '\\${');
+
+function nodeJsx(n: RenderNode, names: Map<string, string>, opts: ReactExportOptions, indent: string): string {
+  const el = n.el;
+  const tag = rootTag(el);
+  const typeAttr = tag === 'button' ? ' type="button"' : '';
+  const disabled = el.disabled && tag === 'button' ? ' disabled' : '';
+  let classAttr: string;
+  let styleAttr = '';
+  if (n.topLevel) {
+    const id = JSON.stringify(el.id);
+    const hiddenCls = opts.tailwind ? ' hidden!' : ' is-hidden';
+    const base = opts.tailwind ? nodeTailwind(n).join(' ') : nodeCls(n);
+    classAttr = ` className={\`${tpl(base)}\${hidden.has(${id}) ? '${hiddenCls}' : ''}\`}`;
+    styleAttr = ` style={anim[${id}] ? { animation: anim[${id}] } : undefined}`;
+  } else {
+    classAttr = ` className=${JSON.stringify(opts.tailwind ? nodeTailwind(n).join(' ') : nodeCls(n))}`;
+  }
+  const inner = n.children.length
+    ? `\n${n.children.map((c) => nodeJsx(c, names, opts, `${indent}  `)).join('\n')}\n${indent}`
+    : innerJsx(el, indent);
+  return `${indent}<${tag}${classAttr}${styleAttr}${typeAttr}${disabled} data-name=${JSON.stringify(el.name)}${interactionProp(el, names)}>${inner}</${tag}>`;
+}
+
+export function buildScreenComponent(doc: WebDesignDoc, screen: WDScreen, names: Map<string, string>, opts: ReactExportOptions): string {
   const name = names.get(screen.id)!;
-  const els = renderableElements(screen);
-  const lines = els.map((el) => {
-    const tag = rootTag(el);
-    const typeAttr = tag === 'button' ? ' type="button"' : '';
-    const hiddenExpr = `hidden.has(${JSON.stringify(el.id)})`;
-    let classAttr: string;
-    if (opts.tailwind) {
-      const hv = hoverCss(el);
-      const classes = [...cssToTailwind({ ...boxCss(el, screen), ...visualCss(el) }), ...(hv ? cssToTailwind(hv, 'hover:') : [])].join(' ');
-      classAttr = ` className={\`${classes.replace(/`/g, '\\`').replace(/\$\{/g, '\\${')}\${${hiddenExpr} ? ' hidden!' : ''}\`}`;
-    } else {
-      classAttr = ` className={\`${cls(el)}\${${hiddenExpr} ? ' is-hidden' : ''}\`}`;
-    }
-    const inner = innerJsx(el, '      ');
-    return `      <${tag}${classAttr}${typeAttr} data-name=${JSON.stringify(el.name)}${interactionProp(el, names)}>${inner}</${tag}>`;
-  });
+  const lines = buildRenderTree(doc, screen).map((n) => nodeJsx(n, names, opts, '      '));
   const screenStyle = opts.tailwind
     ? ` className="relative w-full overflow-x-hidden" style={${JSON.stringify(cssToReact({ 'min-height': `${screen.height}px`, background: safeColor(screen.background, '#ffffff') }))}}`
     : ` className="${screenCls(screen)}"`;
   return `// Gerado pelo OmniDesign Studio
 export interface ScreenProps {
   hidden: Set<string>;
-  onNavigate: (screen: string) => void;
-  onToggle: (elementId: string) => void;
+  /** Running entry animations of toggled elements, by element id. */
+  anim: Record<string, string>;
+  onNavigate: (screen: string, animation: string | null) => void;
+  onToggle: (elementId: string, animation: string | null) => void;
 }
 
-export default function ${name}({ hidden, onNavigate, onToggle }: ScreenProps) {
+export default function ${name}({ hidden, anim, onNavigate, onToggle }: ScreenProps) {
   void onNavigate;
   void onToggle;
   return (
@@ -113,26 +135,45 @@ ${map}
 
 type ScreenName = keyof typeof screens;
 const initialHidden: string[] = ${JSON.stringify(initialHidden)};
+const reduceMotion = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
 export default function App() {
   const [current, setCurrent] = useState<ScreenName>(${JSON.stringify(names.get(doc.screens[0].id))});
   const [hidden, setHidden] = useState(() => new Set(initialHidden));
+  const [anim, setAnim] = useState<Record<string, string>>({});
+  const [screenAnim, setScreenAnim] = useState<string | null>(null);
+  const [visit, setVisit] = useState(0);
   const Screen = screens[current];
-  const toggle = (id: string) =>
+  const toggle = (id: string, animation: string | null) => {
+    const show = hidden.has(id);
     setHidden((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
       return next;
     });
-  const navigate = (screen: string) => {
+    setAnim((prev) => {
+      const next = { ...prev };
+      if (show && animation && !reduceMotion) next[id] = animation;
+      else delete next[id];
+      return next;
+    });
+  };
+  const navigate = (screen: string, animation: string | null) => {
     if (screen in screens) {
       setCurrent(screen as ScreenName);
       setHidden(new Set(initialHidden));
+      setAnim({});
+      setScreenAnim(reduceMotion ? null : animation);
+      setVisit((v) => v + 1);
       window.scrollTo(0, 0);
     }
   };
-  return <Screen hidden={hidden} onNavigate={navigate} onToggle={toggle} />;
+  return (
+    <div key={visit} style={screenAnim ? { animation: screenAnim } : undefined}>
+      <Screen hidden={hidden} anim={anim} onNavigate={navigate} onToggle={toggle} />
+    </div>
+  );
 }
 `;
 }
@@ -180,8 +221,9 @@ export function exportReactProject(doc: WebDesignDoc, opts: ReactExportOptions, 
     'src/App.tsx': buildApp(doc, names, opts),
     'README.md': `# ${projectName}\n\nProjeto exportado pelo OmniDesign Studio.\n\n\`\`\`bash\nnpm install\nnpm run dev\n\`\`\`\n`,
   };
-  if (opts.tailwind) files['src/index.css'] = `@import "tailwindcss";\n\nhtml, body { margin: 0; padding: 0; }\n`;
-  else files['src/styles.css'] = buildCss(doc);
-  for (const s of doc.screens) files[`src/screens/${names.get(s.id)}.tsx`] = buildScreenComponent(s, names, opts);
+  if (opts.tailwind)
+    files['src/index.css'] = `@import "tailwindcss";\n\n${fontFaceCss(opts)}\nhtml, body { margin: 0; padding: 0; }\n${keyframesCss()}\n`;
+  else files['src/styles.css'] = buildCss(doc, opts);
+  for (const s of doc.screens) files[`src/screens/${names.get(s.id)}.tsx`] = buildScreenComponent(doc, s, names, opts);
   return files;
 }

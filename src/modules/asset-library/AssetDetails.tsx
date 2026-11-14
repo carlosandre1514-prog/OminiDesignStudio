@@ -38,6 +38,13 @@ function Preview({ asset }: { asset: Asset }) {
         <FontSample id={asset.id} text="O rápido zorro marrom pula sobre o cão." className="block text-sm" />
       </div>
     );
+  if (asset.kind === 'component')
+    return (
+      <div className="space-y-2">
+        {asset.thumbnail && <img src={asset.thumbnail} alt="" className="max-h-48 w-full rounded bg-white object-contain" />}
+        <p className="text-xs text-ink-400">Componente de interface reutilizável. Insira-o no Web &amp; App Design pelo painel "Componentes" → "Da biblioteca".</p>
+      </div>
+    );
   return (
     <div className="rounded bg-ink-850 p-4 text-center text-xs text-ink-400">
       <div className="text-3xl">◈</div>

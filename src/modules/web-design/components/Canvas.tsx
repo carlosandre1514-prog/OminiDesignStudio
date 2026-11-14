@@ -2,20 +2,21 @@ import { useEffect, useRef, type PointerEvent as RPointerEvent } from 'react';
 import { safeColor } from '@/core/utils/sanitize';
 import { isEffectivelyVisible } from '../layout';
 import type { WDElement, WDScreen } from '../model';
+import { angleFromCenter, containsPoint, resizeRotated, type Handle } from '../geometry';
 import * as ops from '../ops';
-import { selectScreen, useWebDesign } from '../store';
+import { selectEditingBreakpoint, selectScreen, useWebDesign } from '../store';
 import { useView } from '../viewStore';
 import { absBox, ElementView } from './ElementView';
 import { Rulers, RULER } from './Rulers';
 
-type Handle = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w';
 const HANDLES: Handle[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
 const TEXT_TYPES = new Set(['text', 'button', 'icon', 'card', 'modal', 'navbar', 'input']);
 
 type Drag =
   | { kind: 'pan'; sx: number; sy: number; px: number; py: number }
   | { kind: 'move'; wx: number; wy: number; ids: string[]; base: WDScreen; started: boolean }
-  | { kind: 'resize'; handle: Handle; wx: number; wy: number; id: string; rect: ops.Rect; base: WDScreen }
+  | { kind: 'resize'; handle: Handle; wx: number; wy: number; id: string; rect: ops.Rect; rotation: number; base: WDScreen }
+  | { kind: 'rotate'; id: string; cx: number; cy: number; start: number; startRotation: number; base: WDScreen }
   | { kind: 'marquee'; wx: number; wy: number; cx: number; cy: number; additive: boolean; initial: string[] }
   | { kind: 'guide'; axis: 'x' | 'y'; index: number; base: WDScreen };
 
@@ -29,6 +30,8 @@ export function Canvas() {
 
   const screen = useWebDesign(selectScreen);
   const grid = useWebDesign((s) => s.history.present.grid);
+  const bp = useWebDesign(selectEditingBreakpoint);
+  const isComp = useWebDesign((s) => ops.isComponent(s.history.present, s.activeScreenId));
   const selection = useWebDesign((s) => s.selection);
   const { zoom, panX, panY, tool, snapX, snapY, showRulers, editingTextId } = useView();
 
@@ -71,7 +74,7 @@ export function Canvas() {
     for (let i = s.elements.length - 1; i >= 0; i--) {
       const e = s.elements[i];
       if (e.type === 'group' || e.locked || !isEffectivelyVisible(s, e)) continue;
-      if (x >= e.x && x <= e.x + e.w && y >= e.y && y <= e.y + e.h) {
+      if (containsPoint(e, x, y)) {
         if (deep) return e;
         const root = ops.rootAncestor(s, e.id);
         return root && !root.locked ? root : undefined;
@@ -86,7 +89,7 @@ export function Canvas() {
     pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (pointers.current.size === 2) {
       // Two-finger gesture: pinch zoom + pan. Cancel any single-pointer gesture.
-      if (drag.current?.kind === 'move' || drag.current?.kind === 'resize') useWebDesign.getState().endGesture();
+      if (drag.current?.kind === 'move' || drag.current?.kind === 'resize' || drag.current?.kind === 'rotate') useWebDesign.getState().endGesture();
       drag.current = null;
       const [a, b] = [...pointers.current.values()];
       pinch.current = { dist: Math.hypot(a.x - b.x, a.y - b.y), cx: (a.x + b.x) / 2, cy: (a.y + b.y) / 2 };
@@ -119,11 +122,17 @@ export function Canvas() {
       drag.current = { kind: 'guide', axis, index: Number(idx), base: s };
       return;
     }
-    const handle = target.dataset.handle as Handle | undefined;
+    const handle = target.dataset.handle as Handle | 'rot' | undefined;
     if (handle && st.selection.length === 1) {
       const el = s.elements.find((x) => x.id === st.selection[0]);
       if (el && !el.locked) {
-        drag.current = { kind: 'resize', handle, wx: w.x, wy: w.y, id: el.id, rect: { x: el.x, y: el.y, w: el.w, h: el.h }, base: s };
+        if (handle === 'rot') {
+          const cx = el.x + el.w / 2;
+          const cy = el.y + el.h / 2;
+          drag.current = { kind: 'rotate', id: el.id, cx, cy, start: angleFromCenter(cx, cy, w.x, w.y), startRotation: el.rotation, base: s };
+        } else {
+          drag.current = { kind: 'resize', handle, wx: w.x, wy: w.y, id: el.id, rect: { x: el.x, y: el.y, w: el.w, h: el.h }, rotation: el.rotation, base: s };
+        }
         return;
       }
     }
@@ -190,6 +199,15 @@ export function Canvas() {
       }
       v.setSnapLines(snap.guidesX, snap.guidesY);
       st.live(() => ops.translateElements(d.base, d.ids, dx, dy));
+    } else if (d.kind === 'rotate') {
+      let angle = d.startRotation + angleFromCenter(d.cx, d.cy, w.x, w.y) - d.start;
+      angle = ((angle % 360) + 540) % 360 - 180;
+      if (e.shiftKey) angle = Math.round(angle / 15) * 15;
+      angle = Math.round(angle * 10) / 10;
+      st.live(() => ops.updateElements(d.base, [d.id], () => ({ rotation: angle })));
+    } else if (d.kind === 'resize' && d.rotation) {
+      const r = resizeRotated(d.rect, d.rotation, d.handle, w.x - d.wx, w.y - d.wy, e.shiftKey);
+      st.live(() => ops.resizeElement(d.base, d.id, r));
     } else if (d.kind === 'resize') {
       const dx = w.x - d.wx;
       const dy = w.y - d.wy;
@@ -263,7 +281,7 @@ export function Canvas() {
       st.endGesture();
       return;
     }
-    if (d.kind === 'move' || d.kind === 'resize') st.endGesture();
+    if (d.kind === 'move' || d.kind === 'resize' || d.kind === 'rotate') st.endGesture();
   };
 
   const onDoubleClick = (e: React.MouseEvent) => {
@@ -302,14 +320,15 @@ export function Canvas() {
     >
       <div style={{ position: 'absolute', left: 0, top: 0, transformOrigin: '0 0', transform: `translate(${panX}px, ${panY}px) scale(${zoom})` }}>
         <div className="absolute left-0 -top-6 whitespace-nowrap text-ink-400" style={{ fontSize: 12 / zoom, top: -18 / zoom }}>
-          {screen.name} · {screen.width}×{screen.height}
+          {isComp ? `Componente: ${screen.name}` : screen.name}
+          {bp ? ` · ${bp.name} (${bp.mode === 'max' ? '≤' : '≥'}${bp.width}px)` : ''} · {Math.round(screen.width)}×{screen.height}
         </div>
         <div
           style={{
             position: 'relative',
             width: screen.width,
             height: screen.height,
-            background: safeColor(screen.background, '#fff'),
+            background: isComp && screen.background === 'transparent' ? 'repeating-conic-gradient(#e5e7eb 0% 25%, #fff 0% 50%) 0 0 / 16px 16px' : safeColor(screen.background, '#fff'),
             boxShadow: '0 0 0 1px rgba(255,255,255,0.06), 0 10px 40px rgba(0,0,0,0.5)',
             overflow: 'hidden',
           }}
@@ -353,28 +372,50 @@ export function Canvas() {
         {snapY.map((y, i) => <div key={`sy${i}`} className="pointer-events-none absolute" style={{ top: y, left: -10000, height: 1 / zoom, width: 20000, background: '#f43f5e' }} />)}
         {/* selection */}
         {selectedEls.map((el) => (
-          <div key={`s-${el.id}`} className="pointer-events-none absolute" style={{ left: el.x, top: el.y, width: el.w, height: el.h, outline: `${1.5 / zoom}px solid #7c5cff` }} />
+          <div
+            key={`s-${el.id}`}
+            className="pointer-events-none absolute"
+            style={{ left: el.x, top: el.y, width: el.w, height: el.h, outline: `${1.5 / zoom}px solid #7c5cff`, transform: el.rotation ? `rotate(${el.rotation}deg)` : undefined }}
+          />
         ))}
         {bounds && selectedEls.length > 1 && (
           <div className="pointer-events-none absolute" style={{ left: bounds.x, top: bounds.y, width: bounds.w, height: bounds.h, outline: `${1 / zoom}px dashed #9a82ff` }} />
         )}
-        {selectedEls.length === 1 && !selectedEls[0].locked &&
-          HANDLES.map((h) => {
-            const el = selectedEls[0];
-            const x = h.includes('w') ? el.x : h.includes('e') ? el.x + el.w : el.x + el.w / 2;
-            const y = h.includes('n') ? el.y : h.includes('s') ? el.y + el.h : el.y + el.h / 2;
-            return (
-              <div
-                key={h}
-                data-handle={h}
-                className="absolute rounded-[2px] border bg-white"
-                style={{ left: x - hs / 2, top: y - hs / 2, width: hs, height: hs, borderWidth: 1 / zoom, borderColor: '#7c5cff', cursor: `${h}-resize` }}
-              />
-            );
-          })}
+        {selectedEls.length === 1 && !selectedEls[0].locked && (
+          <div
+            className="pointer-events-none absolute"
+            style={{ left: selectedEls[0].x, top: selectedEls[0].y, width: selectedEls[0].w, height: selectedEls[0].h, transform: selectedEls[0].rotation ? `rotate(${selectedEls[0].rotation}deg)` : undefined }}
+          >
+            {HANDLES.map((h) => {
+              const el = selectedEls[0];
+              const x = h.includes('w') ? 0 : h.includes('e') ? el.w : el.w / 2;
+              const y = h.includes('n') ? 0 : h.includes('s') ? el.h : el.h / 2;
+              return (
+                <div
+                  key={h}
+                  data-handle={h}
+                  className="pointer-events-auto absolute rounded-[2px] border bg-white"
+                  style={{ left: x - hs / 2, top: y - hs / 2, width: hs, height: hs, borderWidth: 1 / zoom, borderColor: '#7c5cff', cursor: `${h}-resize` }}
+                />
+              );
+            })}
+            {selectedEls[0].type !== 'group' && (
+              <>
+                <div className="absolute" style={{ left: selectedEls[0].w / 2 - 0.5 / zoom, top: -22 / zoom, width: 1 / zoom, height: 22 / zoom, background: '#7c5cff' }} />
+                <div
+                  data-handle="rot"
+                  title="Girar (Shift: passos de 15°)"
+                  className="pointer-events-auto absolute rounded-full border bg-white"
+                  style={{ left: selectedEls[0].w / 2 - hs / 1.6, top: -22 / zoom - hs / 1.6, width: hs * 1.25, height: hs * 1.25, borderWidth: 1 / zoom, borderColor: '#7c5cff', cursor: 'grab' }}
+                />
+              </>
+            )}
+          </div>
+        )}
         {selectedEls.length === 1 && (
-          <div className="pointer-events-none absolute whitespace-nowrap rounded bg-accent-500 px-1 text-white" style={{ left: selectedEls[0].x, top: selectedEls[0].y + selectedEls[0].h + 6 / zoom, fontSize: 11 / zoom }}>
+          <div className="pointer-events-none absolute whitespace-nowrap rounded bg-accent-500 px-1 text-white" style={{ left: selectedEls[0].x, top: (bounds?.y ?? 0) + (bounds?.h ?? 0) + 6 / zoom, fontSize: 11 / zoom }}>
             {Math.round(selectedEls[0].w)} × {Math.round(selectedEls[0].h)}
+            {selectedEls[0].rotation ? ` · ${Math.round(selectedEls[0].rotation)}°` : ''}
           </div>
         )}
         <div ref={marqueeRef} className="pointer-events-none absolute hidden border border-accent-400 bg-accent-500/10" style={{ borderWidth: 1 / zoom }} />

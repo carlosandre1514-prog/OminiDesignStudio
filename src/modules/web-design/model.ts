@@ -12,7 +12,9 @@ export type ElementType =
   | 'navbar'
   | 'menu'
   | 'modal'
-  | 'group';
+  | 'group'
+  /** Instance of a reusable component (master lives in doc.components). */
+  | 'instance';
 
 export type ConstraintH = 'left' | 'right' | 'center' | 'stretch' | 'scale';
 export type ConstraintV = 'top' | 'bottom' | 'center' | 'stretch' | 'scale';
@@ -42,10 +44,42 @@ export interface WDStyle {
 
 export type HoverStyle = Partial<Pick<WDStyle, 'fill' | 'textColor' | 'borderColor'>>;
 
+export type Transition = 'none' | 'fade' | 'slide-left' | 'slide-right' | 'slide-up' | 'slide-down' | 'zoom';
+
+export const TRANSITIONS: { id: Transition; label: string }[] = [
+  { id: 'none', label: 'Instantânea' },
+  { id: 'fade', label: 'Dissolver' },
+  { id: 'slide-left', label: 'Deslizar ←' },
+  { id: 'slide-right', label: 'Deslizar →' },
+  { id: 'slide-up', label: 'Deslizar ↑' },
+  { id: 'slide-down', label: 'Deslizar ↓' },
+  { id: 'zoom', label: 'Zoom' },
+];
+
 export type Interaction =
-  | { type: 'navigate'; screenId: string }
-  | { type: 'toggle'; targetId: string }
+  | { type: 'navigate'; screenId: string; transition?: Transition; duration?: number }
+  | { type: 'toggle'; targetId: string; transition?: Transition; duration?: number }
   | { type: 'url'; href: string };
+
+/** Per-breakpoint manual adjustments (desktop-first or mobile-first media queries). */
+export interface ElementOverride {
+  x?: number;
+  y?: number;
+  w?: number;
+  h?: number;
+  visible?: boolean;
+  fontSize?: number;
+}
+
+export interface Breakpoint {
+  id: string;
+  name: string;
+  /** "max" = applies at widths <= width; "min" = applies at widths >= width. */
+  mode: 'max' | 'min';
+  width: number;
+  /** Frame width used to edit and preview the breakpoint. */
+  previewWidth: number;
+}
 
 export interface WDElement {
   id: string;
@@ -64,7 +98,23 @@ export interface WDElement {
   constraintV: ConstraintV;
   style: WDStyle;
   hover: HoverStyle | null;
+  /** Style while pressed (:active). */
+  pressed: HoverStyle | null;
+  /** Style while focused (:focus-within), mainly for inputs. */
+  focus: HoverStyle | null;
+  /** Disabled state: no interactions, reduced opacity, native disabled attribute. */
+  disabled: boolean;
+  /** Rotation in degrees around the element centre. */
+  rotation: number;
   interaction: Interaction | null;
+  /** Built-in icon name (Lucide set) for "icon" elements; falls back to the text glyph. */
+  iconName?: string;
+  /** For "instance" elements. */
+  componentId?: string;
+  /** Instance text overrides keyed by the component child id. */
+  textOverrides?: Record<string, string>;
+  /** Manual adjustments keyed by breakpoint id. */
+  overrides?: Record<string, ElementOverride>;
   text?: string;
   subtext?: string;
   src?: string;
@@ -88,9 +138,14 @@ export interface GridSettings {
   snap: boolean;
 }
 
+/** A reusable component master. Same shape as a screen (its own frame and elements). */
+export type WDComponent = WDScreen;
+
 export interface WebDesignDoc {
   version: 1;
   screens: WDScreen[];
+  components: WDComponent[];
+  breakpoints: Breakpoint[];
   grid: GridSettings;
 }
 
@@ -122,6 +177,7 @@ export const ELEMENT_LABELS: Record<ElementType, string> = {
   menu: 'Menu',
   modal: 'Modal',
   group: 'Grupo',
+  instance: 'Instância',
 };
 
 export const INSERTABLE: ElementType[] = ['frame', 'ellipse', 'text', 'button', 'image', 'icon', 'input', 'card', 'navbar', 'menu', 'modal'];
@@ -145,6 +201,10 @@ export function createElement(type: ElementType, x: number, y: number, overrides
     constraintV: 'top',
     style: { ...DEFAULT_STYLE },
     hover: null,
+    pressed: null,
+    focus: null,
+    disabled: false,
+    rotation: 0,
     interaction: null,
   };
   switch (type) {
@@ -197,6 +257,7 @@ export function createElement(type: ElementType, x: number, y: number, overrides
       base.constraintV = 'center';
       break;
     case 'group':
+    case 'instance':
       base.style = { ...base.style, fill: 'transparent' };
       break;
   }
@@ -207,18 +268,33 @@ export function createScreen(name = 'Tela 1', width = 1280, height = 800): WDScr
   return { id: createId('scr'), name, width, height, background: '#ffffff', elements: [], guides: { x: [], y: [] } };
 }
 
-export function createEmptyDoc(width = 1280, height = 800, grid?: Partial<GridSettings>): WebDesignDoc {
-  return { version: 1, screens: [createScreen('Tela 1', width, height)], grid: { size: 8, show: true, snap: true, ...grid } };
+/** Default breakpoints: desktop-first for wide designs, mobile-first for narrow ones. */
+export function defaultBreakpoints(designWidth: number): Breakpoint[] {
+  return designWidth >= 900
+    ? [
+        { id: 'bp-tablet', name: 'Tablet', mode: 'max', width: 1023, previewWidth: 820 },
+        { id: 'bp-mobile', name: 'Celular', mode: 'max', width: 639, previewWidth: 390 },
+      ]
+    : [
+        { id: 'bp-tablet', name: 'Tablet', mode: 'min', width: 640, previewWidth: 820 },
+        { id: 'bp-desktop', name: 'Desktop', mode: 'min', width: 1024, previewWidth: 1440 },
+      ];
 }
 
-/** Validate and repair data loaded from storage. Unknown/corrupt parts are dropped instead of crashing. */
-export function normalizeDoc(raw: unknown): WebDesignDoc {
-  if (!raw || typeof raw !== 'object') return createEmptyDoc();
-  const r = raw as Partial<WebDesignDoc>;
-  const screens = Array.isArray(r.screens)
-    ? r.screens.filter((s): s is WDScreen => !!s && typeof s === 'object' && typeof s.id === 'string')
-    : [];
-  const fixed = screens.map((s) => ({
+export function createEmptyDoc(width = 1280, height = 800, grid?: Partial<GridSettings>): WebDesignDoc {
+  return {
+    version: 1,
+    screens: [createScreen('Tela 1', width, height)],
+    components: [],
+    breakpoints: defaultBreakpoints(width),
+    grid: { size: 8, show: true, snap: true, ...grid },
+  };
+}
+
+const num = (v: unknown, d: number) => (typeof v === 'number' && Number.isFinite(v) ? v : d);
+
+function normalizeFrame(s: WDScreen): WDScreen {
+  return {
     id: s.id,
     name: typeof s.name === 'string' ? s.name : 'Tela',
     width: Number(s.width) > 0 ? Number(s.width) : 1280,
@@ -229,14 +305,43 @@ export function normalizeDoc(raw: unknown): WebDesignDoc {
       .filter((e) => e && typeof e === 'object' && typeof e.id === 'string' && typeof e.type === 'string' && e.type in ELEMENT_LABELS)
       .map((e) => {
         const d = createElement(e.type, 0, 0);
-        return { ...d, ...e, style: { ...d.style, ...(e.style ?? {}) } };
+        const el: WDElement = { ...d, ...e, style: { ...d.style, ...(e.style ?? {}) } };
+        el.rotation = num(e.rotation, 0);
+        el.pressed = e.pressed ?? null;
+        el.focus = e.focus ?? null;
+        el.disabled = !!e.disabled;
+        if (e.overrides && typeof e.overrides !== 'object') delete el.overrides;
+        return el;
       }),
-  }));
-  const ids = new Set(fixed.flatMap((s) => s.elements.map((e) => e.id)));
-  for (const s of fixed) for (const e of s.elements) if (e.parentId && !ids.has(e.parentId)) e.parentId = null;
+  };
+}
+
+const isFrame = (s: unknown): s is WDScreen => !!s && typeof s === 'object' && typeof (s as WDScreen).id === 'string';
+
+/** Validate and repair data loaded from storage. Unknown/corrupt parts are dropped instead of crashing. */
+export function normalizeDoc(raw: unknown): WebDesignDoc {
+  if (!raw || typeof raw !== 'object') return createEmptyDoc();
+  const r = raw as Partial<WebDesignDoc>;
+  const fixed = (Array.isArray(r.screens) ? r.screens.filter(isFrame) : []).map(normalizeFrame);
+  const components = (Array.isArray(r.components) ? r.components.filter(isFrame) : []).map(normalizeFrame);
+  const compIds = new Set(components.map((c) => c.id));
+  for (const frame of [...fixed, ...components]) {
+    const ids = new Set(frame.elements.map((e) => e.id));
+    for (const e of frame.elements) if (e.parentId && !ids.has(e.parentId)) e.parentId = null;
+    // Instances of missing components (or nested in their own master) are dropped.
+    frame.elements = frame.elements.filter((e) => e.type !== 'instance' || (!!e.componentId && compIds.has(e.componentId) && e.componentId !== frame.id));
+  }
+  const screens = fixed.length ? fixed : [createScreen()];
+  const breakpoints = Array.isArray(r.breakpoints)
+    ? r.breakpoints
+        .filter((b) => b && typeof b.id === 'string' && (b.mode === 'max' || b.mode === 'min') && Number(b.width) > 0)
+        .map((b) => ({ id: b.id, name: typeof b.name === 'string' ? b.name : 'Breakpoint', mode: b.mode, width: Number(b.width), previewWidth: Number(b.previewWidth) > 0 ? Number(b.previewWidth) : Number(b.width) }))
+    : defaultBreakpoints(screens[0].width);
   return {
     version: 1,
-    screens: fixed.length ? fixed : [createScreen()],
+    screens,
+    components,
+    breakpoints,
     grid: {
       size: Number(r.grid?.size) > 0 ? Number(r.grid?.size) : 8,
       show: r.grid?.show ?? true,

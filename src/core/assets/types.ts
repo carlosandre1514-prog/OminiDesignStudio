@@ -1,4 +1,4 @@
-export type AssetKind = 'image' | 'vector' | 'audio' | 'font' | 'model3d';
+export type AssetKind = 'image' | 'vector' | 'audio' | 'font' | 'model3d' | 'component';
 
 export type AssetCategory =
   | 'models3d'
@@ -39,6 +39,7 @@ export const KIND_LABELS: Record<AssetKind, string> = {
   audio: 'Áudio',
   font: 'Fonte',
   model3d: 'Modelo 3D',
+  component: 'Componente de UI',
 };
 
 export interface AssetMeta {

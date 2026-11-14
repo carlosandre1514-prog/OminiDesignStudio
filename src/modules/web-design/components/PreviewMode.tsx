@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { safeColor, safeUrl } from '@/core/utils/sanitize';
-import { boxCss, DEVICE_PRESETS, renderableElements } from '../layout';
-import type { WDElement, WebDesignDoc } from '../model';
-import { ElementView } from './ElementView';
+import { effectiveElement } from '../breakpoints';
+import { DEVICE_PRESETS, isEffectivelyVisible } from '../layout';
+import type { Transition, WDElement, WebDesignDoc } from '../model';
+import { absBox, ElementView, playEnter } from './ElementView';
 
 interface Props {
   doc: WebDesignDoc;
@@ -19,6 +20,12 @@ export function PreviewMode({ doc, startScreenId, onClose, showcase }: Props) {
   const [screenId, setScreenId] = useState(startScreenId);
   const [hidden, setHidden] = useState(() => initialHidden(doc));
   const [historyStack, setHistoryStack] = useState<string[]>([]);
+  const [screenAnim, setScreenAnim] = useState<{ t?: Transition; d?: number; visit: number }>({ visit: 0 });
+  const [entering, setEntering] = useState<Record<string, { transition: Transition; duration: number }>>({});
+  const mainRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    if (screenAnim.visit) playEnter(mainRef.current, screenAnim.t, screenAnim.d);
+  }, [screenAnim]);
   const screen = doc.screens.find((s) => s.id === screenId) ?? doc.screens[0];
   const [preset, setPreset] = useState<string>('design');
   const [customW, setCustomW] = useState(screen.width);
@@ -62,30 +69,49 @@ export function PreviewMode({ doc, startScreenId, onClose, showcase }: Props) {
   const pad = 32;
   const scale = Math.min(1, (area.w - pad) / vw, (area.h - pad) / vh);
 
-  const go = (id: string) => {
+  const go = (id: string, t?: Transition, d?: number) => {
     setHistoryStack((h) => [...h, screenId]);
     setScreenId(id);
     setHidden(initialHidden(doc));
+    setEntering({});
+    setScreenAnim((a) => ({ t, d, visit: a.visit + 1 }));
   };
 
   const activate = (el: WDElement) => {
     const i = el.interaction;
     if (!i) return;
-    if (i.type === 'navigate' && doc.screens.some((s) => s.id === i.screenId)) go(i.screenId);
-    if (i.type === 'toggle')
+    if (i.type === 'navigate' && doc.screens.some((s) => s.id === i.screenId)) go(i.screenId, i.transition, i.duration);
+    if (i.type === 'toggle') {
+      const show = hidden.has(i.targetId);
+      setEntering((prev) => {
+        const next = { ...prev };
+        if (show && i.transition && i.transition !== 'none') next[i.targetId] = { transition: i.transition, duration: i.duration ?? 300 };
+        else delete next[i.targetId];
+        return next;
+      });
       setHidden((prev) => {
         const next = new Set(prev);
         if (next.has(i.targetId)) next.delete(i.targetId);
         else next.add(i.targetId);
         return next;
       });
+    }
     if (i.type === 'url') {
       const href = safeUrl(i.href);
       if (/^https?:/i.test(href)) window.open(href, '_blank', 'noopener');
     }
   };
 
-  const elements = useMemo(() => renderableElements(screen), [screen]);
+  // Same layout rules as the exported CSS: constraints + every breakpoint matching the viewport width.
+  const elements = useMemo(
+    () =>
+      screen.elements
+        .filter((e) => e.type !== 'group')
+        .map((e) => ({ base: e, eff: effectiveElement(e, screen, doc.breakpoints, vw) }))
+        .filter(({ base, eff }) => eff.visible && (!base.parentId || isEffectivelyVisible(screen, screen.elements.find((p) => p.id === base.parentId)!)))
+        .map(({ eff }) => eff),
+    [screen, doc.breakpoints, vw],
+  );
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-ink-950" role="dialog" aria-label="Pré-visualização do protótipo">
@@ -99,6 +125,7 @@ export function PreviewMode({ doc, startScreenId, onClose, showcase }: Props) {
           setHistoryStack((h) => h.slice(0, -1));
           setScreenId(prev);
           setHidden(initialHidden(doc));
+          setEntering({});
         }}>← Voltar</button>
         <button className="btn-ghost text-xs" onClick={() => setHidden(initialHidden(doc))}>Reiniciar estados</button>
         {!showcase && (
@@ -127,9 +154,9 @@ export function PreviewMode({ doc, startScreenId, onClose, showcase }: Props) {
       <div ref={areaRef} className="flex min-h-0 flex-1 items-center justify-center overflow-hidden">
         <div style={{ width: vw * scale, height: vh * scale }} className="overflow-hidden rounded-md shadow-2xl ring-1 ring-white/10">
           <div style={{ width: vw, height: vh, transform: `scale(${scale})`, transformOrigin: '0 0', overflowY: 'auto', overflowX: 'hidden', background: safeColor(screen.background, '#fff') }}>
-            <main data-testid="preview-screen" style={{ position: 'relative', width: '100%', height: screen.height, minHeight: screen.height }}>
+            <main ref={mainRef} data-testid="preview-screen" style={{ position: 'relative', width: '100%', height: screen.height, minHeight: screen.height }}>
               {elements.map((el) =>
-                hidden.has(el.id) ? null : <ElementView key={el.id} el={el} box={boxCss(el, screen)} interactive onActivate={activate} />,
+                hidden.has(el.id) ? null : <ElementView key={el.id} el={el} box={absBox(el)} interactive onActivate={activate} enter={entering[el.id] ?? null} />,
               )}
             </main>
           </div>

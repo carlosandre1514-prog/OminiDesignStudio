@@ -1,4 +1,5 @@
 import { escapeHtml, safeUrl } from '@/core/utils/sanitize';
+import { iconJsx, iconSvg } from '../icons';
 import type { WDElement } from '../model';
 
 /** HTML tag used as the element's root node. */
@@ -30,16 +31,17 @@ export function innerHtml(el: WDElement, indent: string): string {
   const t = escapeHtml(el.text ?? '');
   const items = (el.items ?? []).map((i) => escapeHtml(i));
   switch (el.type) {
+    case 'icon':
+      return iconSvg(el.iconName) || t;
     case 'text':
     case 'button':
-    case 'icon':
       return t;
     case 'image': {
       const src = safeUrl(el.src);
       return src ? `<img src="${escapeHtml(src)}" alt="${escapeHtml(el.name)}" style="${IMG_STYLE}" />` : '';
     }
     case 'input':
-      return `<input type="text" placeholder="${escapeHtml(el.placeholder ?? '')}" value="${t}" aria-label="${escapeHtml(el.name)}" style="${INPUT_STYLE}" />`;
+      return `<input type="text" placeholder="${escapeHtml(el.placeholder ?? '')}" value="${t}" aria-label="${escapeHtml(el.name)}"${el.disabled ? ' disabled' : ''} style="${INPUT_STYLE}" />`;
     case 'card':
     case 'modal':
       return `\n${indent}  <h3 style="margin:0;font-size:inherit;font-weight:inherit">${t}</h3>\n${indent}  <p style="margin:0;font-size:0.8em;font-weight:400;opacity:0.8">${escapeHtml(el.subtext ?? '')}</p>\n${indent}`;
@@ -60,9 +62,10 @@ export function innerJsx(el: WDElement, indent: string): string {
   const items = el.items ?? [];
   const link = `{ color: 'inherit', textDecoration: 'none', padding: '6px 8px', borderRadius: 4 }`;
   switch (el.type) {
+    case 'icon':
+      return iconJsx(el.iconName) || t;
     case 'text':
     case 'button':
-    case 'icon':
       return t;
     case 'image': {
       const src = safeUrl(el.src);
@@ -71,7 +74,7 @@ export function innerJsx(el: WDElement, indent: string): string {
         : '';
     }
     case 'input':
-      return `<input type="text" placeholder={${lit(el.placeholder ?? '')}} defaultValue={${lit(el.text ?? '')}} aria-label={${lit(el.name)}} style={{ width: '100%', height: '100%', border: 0, outline: 0, background: 'transparent', font: 'inherit', color: 'inherit' }} />`;
+      return `<input type="text" placeholder={${lit(el.placeholder ?? '')}} defaultValue={${lit(el.text ?? '')}} aria-label={${lit(el.name)}}${el.disabled ? ' disabled' : ''} style={{ width: '100%', height: '100%', border: 0, outline: 0, background: 'transparent', font: 'inherit', color: 'inherit' }} />`;
     case 'card':
     case 'modal':
       return `\n${indent}  <h3 style={{ margin: 0, fontSize: 'inherit', fontWeight: 'inherit' }}>${t}</h3>\n${indent}  <p style={{ margin: 0, fontSize: '0.8em', fontWeight: 400, opacity: 0.8 }}>${jsxText(el.subtext ?? '')}</p>\n${indent}`;

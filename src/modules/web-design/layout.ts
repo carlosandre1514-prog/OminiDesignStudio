@@ -73,12 +73,15 @@ export function visualCss(el: WDElement): CssMap {
   if (el.type === 'ellipse') css['border-radius'] = '50%';
   const sh = shadowCss(s.shadow);
   if (sh) css['box-shadow'] = sh;
-  if (s.opacity < 1) css.opacity = String(Math.max(0, s.opacity));
+  const opacity = el.disabled ? s.opacity * 0.5 : s.opacity;
+  if (opacity < 1) css.opacity = String(Math.max(0, Math.round(opacity * 1000) / 1000));
+  if (el.rotation) css.transform = `rotate(${Math.round(el.rotation * 100) / 100}deg)`;
+  if (el.disabled) css.cursor = 'not-allowed';
   if (s.padding > 0) css.padding = px(s.padding);
   switch (el.type) {
     case 'button':
     case 'icon':
-      Object.assign(css, { display: 'flex', 'align-items': 'center', 'justify-content': s.textAlign === 'left' ? 'flex-start' : s.textAlign === 'right' ? 'flex-end' : 'center', cursor: 'pointer', 'user-select': 'none' });
+      Object.assign(css, { display: 'flex', 'align-items': 'center', 'justify-content': s.textAlign === 'left' ? 'flex-start' : s.textAlign === 'right' ? 'flex-end' : 'center', cursor: el.disabled ? 'not-allowed' : el.type === 'button' ? 'pointer' : 'default', 'user-select': 'none' });
       break;
     case 'text':
       Object.assign(css, { 'white-space': 'pre-wrap', 'overflow-wrap': 'break-word', 'line-height': '1.3' });
@@ -103,13 +106,32 @@ export function visualCss(el: WDElement): CssMap {
   return css;
 }
 
-export function hoverCss(el: WDElement): CssMap | null {
-  if (!el.hover) return null;
+export type StateName = 'hover' | 'pressed' | 'focus';
+
+/** CSS for an interaction state (hover / pressed / focus). Disabled elements have no states. */
+export function stateCss(el: WDElement, state: StateName): CssMap | null {
+  const st = el[state];
+  if (!st || el.disabled) return null;
   const css: CssMap = {};
-  if (el.hover.fill) css['background-color'] = safeColor(el.hover.fill);
-  if (el.hover.textColor) css.color = safeColor(el.hover.textColor);
-  if (el.hover.borderColor && el.style.borderWidth > 0) css['border-color'] = safeColor(el.hover.borderColor);
+  if (st.fill) css['background-color'] = safeColor(st.fill);
+  if (st.textColor) css.color = safeColor(st.textColor);
+  if (st.borderColor && el.style.borderWidth > 0) css['border-color'] = safeColor(st.borderColor);
   return Object.keys(css).length ? css : null;
+}
+
+export const hoverCss = (el: WDElement) => stateCss(el, 'hover');
+
+/** The display value an element uses when visible (needed to re-show it inside a media query). */
+export function naturalDisplay(el: WDElement): string {
+  return visualCss(el).display ?? 'block';
+}
+
+/** Position CSS that sets all six box properties (so a media query fully replaces the base box). */
+export function fullBoxCss(el: WDElement, frame: Pick<WDScreen, 'width' | 'height'>): CssMap {
+  const b = boxCss(el, frame);
+  const out: CssMap = {};
+  for (const k of ['left', 'right', 'width', 'top', 'bottom', 'height']) out[k] = b[k] ?? 'auto';
+  return out;
 }
 
 export function cssToString(css: CssMap, indent = '  '): string {
@@ -128,6 +150,20 @@ export function cssToReact(css: CssMap): Record<string, string> {
 /** Elements rendered as DOM nodes (groups are organisational only and are flattened). */
 export function renderableElements(screen: WDScreen): WDElement[] {
   return screen.elements.filter((e) => e.type !== 'group' && isEffectivelyVisible(screen, e));
+}
+
+/**
+ * Elements emitted by exporters: visible at the base size OR made visible by a breakpoint override.
+ * (Elements hidden everywhere are omitted.)
+ */
+export function exportableElements(screen: WDScreen): WDElement[] {
+  return screen.elements.filter((e) => {
+    if (e.type === 'group') return false;
+    if (isEffectivelyVisible(screen, e)) return true;
+    // Hidden at base: keep only if a breakpoint shows it and its ancestors are visible.
+    const parentVisible = !e.parentId || isEffectivelyVisible(screen, screen.elements.find((p) => p.id === e.parentId)!);
+    return parentVisible && Object.values(e.overrides ?? {}).some((o) => o.visible === true);
+  });
 }
 
 export function isEffectivelyVisible(screen: WDScreen, el: WDElement): boolean {

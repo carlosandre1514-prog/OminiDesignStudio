@@ -29,6 +29,7 @@ export const FORMATS: Record<string, FormatInfo> = {
   mtl: { ext: 'mtl', mime: 'model/mtl', kind: 'model3d', category: 'materials', label: 'MTL' },
   fbx: { ext: 'fbx', mime: 'application/octet-stream', kind: 'model3d', category: 'models3d', label: 'FBX' },
   stl: { ext: 'stl', mime: 'model/stl', kind: 'model3d', category: 'models3d', label: 'STL' },
+  omnicomp: { ext: 'omnicomp', mime: 'application/json', kind: 'component', category: 'components', label: 'Componente OmniDesign' },
 };
 
 export const ACCEPT_ATTR = Object.keys(FORMATS).map((e) => `.${e}`).join(',');
@@ -113,6 +114,15 @@ export function validateContent(ext: string, bytes: Uint8Array): string | null {
       if (b.length < 84) return 'STL corrompido';
       const count = new DataView(b.buffer, b.byteOffset, b.byteLength).getUint32(80, true);
       return ok(84 + count * 50 === b.length, 'STL');
+    }
+    case 'omnicomp': {
+      if (!looksText(b)) return 'Componente deve ser JSON';
+      try {
+        const j = JSON.parse(new TextDecoder().decode(b));
+        return ok(j?.format === 'omnidesign-component' && !!j.component && Array.isArray(j.component.elements), 'de componente');
+      } catch {
+        return 'Componente corrompido: JSON inválido';
+      }
     }
     default:
       return 'Formato não suportado';

@@ -3,6 +3,7 @@ import { commit, createHistory, redo, replace, undo, type HistoryState } from '@
 import { createVersion, getDocument, saveModuleData, updateProjectMeta } from '@/core/projects/projectService';
 import { useSettings } from '@/core/settings/settings';
 import { debounce, type Debounced } from '@/core/utils/debounce';
+import { projectScreen, writeBack } from './breakpoints';
 import { createEmptyDoc, normalizeDoc, type WDElement, type WDScreen, type WebDesignDoc } from './model';
 import * as ops from './ops';
 import { renderScreenThumbnail } from './thumbnail';
@@ -18,6 +19,8 @@ interface WebDesignState {
   history: HistoryState<WebDesignDoc>;
   gestureBase: WebDesignDoc | null;
   activeScreenId: string;
+  /** Breakpoint being edited (null = base layout). Only applies to screens, not component masters. */
+  activeBreakpoint: string | null;
   selection: string[];
   saveStatus: SaveStatus;
   saveError: string | null;
@@ -34,6 +37,7 @@ interface WebDesignState {
   undo(): void;
   redo(): void;
   setActiveScreen(id: string): void;
+  setActiveBreakpoint(id: string | null): void;
   select(ids: string[]): void;
   saveNow(): Promise<void>;
   /** Replace the whole doc (e.g. after restoring a version) without keeping undo history. */
@@ -43,6 +47,7 @@ interface WebDesignState {
 let saver: Debounced<[]> | null = null;
 let autoVersionTimer: ReturnType<typeof setInterval> | null = null;
 let changedSinceVersion = false;
+let settingsUnsub: (() => void) | null = null;
 let thumbTimer: ReturnType<typeof setTimeout> | null = null;
 
 export const useWebDesign = create<WebDesignState>((set, get) => {
@@ -70,6 +75,27 @@ export const useWebDesign = create<WebDesignState>((set, get) => {
     }, 1500);
   };
 
+  const startAutoVersion = (minutes: number) => {
+    if (autoVersionTimer) clearInterval(autoVersionTimer);
+    autoVersionTimer = null;
+    if (minutes <= 0) return;
+    autoVersionTimer = setInterval(() => {
+      const id = get().projectId;
+      if (id && changedSinceVersion) {
+        changedSinceVersion = false;
+        saver?.flush();
+        createVersion(id, 'Automático', true).catch(() => undefined);
+      }
+    }, minutes * 60_000);
+  };
+
+  /** Apply `fn` to the active frame, through the breakpoint projection when one is active. */
+  const editFrame = (doc: WebDesignDoc, fn: (screen: WDScreen) => WDScreen): WebDesignDoc => {
+    const { activeScreenId, activeBreakpoint } = get();
+    const bp = activeBreakpoint && !ops.isComponent(doc, activeScreenId) ? activeBreakpoint : null;
+    return ops.updateScreen(doc, activeScreenId, (base) => (bp ? writeBack(base, fn(projectScreen(base, doc.breakpoints, bp)), doc.breakpoints, bp) : fn(base)));
+  };
+
   const markDirty = () => {
     changedSinceVersion = true;
     set({ saveStatus: 'dirty' });
@@ -78,7 +104,7 @@ export const useWebDesign = create<WebDesignState>((set, get) => {
 
   const setHistory = (history: HistoryState<WebDesignDoc>) => {
     const { activeScreenId, selection } = get();
-    const screen = history.present.screens.find((s) => s.id === activeScreenId) ?? history.present.screens[0];
+    const screen = ops.getScreen(history.present, activeScreenId) ?? history.present.screens[0];
     const ids = new Set(screen.elements.map((e) => e.id));
     set({ history, activeScreenId: screen.id, selection: selection.filter((id) => ids.has(id)) });
   };
@@ -90,6 +116,7 @@ export const useWebDesign = create<WebDesignState>((set, get) => {
     history: createHistory(createEmptyDoc()),
     gestureBase: null,
     activeScreenId: '',
+    activeBreakpoint: null,
     selection: [],
     saveStatus: 'idle',
     saveError: null,
@@ -107,19 +134,21 @@ export const useWebDesign = create<WebDesignState>((set, get) => {
           ? normalizeDoc(raw)
           : createEmptyDoc(1280, 800, { size: settings.defaultGridSize, show: settings.showGridByDefault, snap: settings.snapToGridByDefault });
         saver = debounce(() => void persist(), settings.autosaveDelayMs);
-        if (settings.autoVersionMinutes > 0) {
-          autoVersionTimer = setInterval(() => {
-            const id = get().projectId;
-            if (id && changedSinceVersion) {
-              changedSinceVersion = false;
-              saver?.flush();
-              createVersion(id, 'Automático', true).catch(() => undefined);
-            }
-          }, settings.autoVersionMinutes * 60_000);
-        }
+        startAutoVersion(settings.autoVersionMinutes);
+        // Apply settings changes immediately (no need to reopen the project).
+        settingsUnsub?.();
+        settingsUnsub = useSettings.subscribe((st, prev) => {
+          if (!get().projectId) return;
+          if (st.settings.autoVersionMinutes !== prev.settings.autoVersionMinutes) startAutoVersion(st.settings.autoVersionMinutes);
+          if (st.settings.autosaveDelayMs !== prev.settings.autosaveDelayMs) {
+            saver?.flush();
+            saver = debounce(() => void persist(), st.settings.autosaveDelayMs);
+          }
+        });
         set({
           history: createHistory(wd),
           activeScreenId: wd.screens[0].id,
+          activeBreakpoint: null,
           selection: [],
           loading: false,
           saveStatus: raw ? 'saved' : 'idle',
@@ -136,6 +165,8 @@ export const useWebDesign = create<WebDesignState>((set, get) => {
       saver = null;
       if (autoVersionTimer) clearInterval(autoVersionTimer);
       autoVersionTimer = null;
+      settingsUnsub?.();
+      settingsUnsub = null;
       changedSinceVersion = false;
       set({ projectId: null, selection: [], gestureBase: null });
     },
@@ -149,14 +180,13 @@ export const useWebDesign = create<WebDesignState>((set, get) => {
     },
 
     applyScreen(fn) {
-      const id = get().activeScreenId;
-      get().apply((doc) => ops.updateScreen(doc, id, fn));
+      get().apply((doc) => editFrame(doc, fn));
     },
 
     live(fn) {
-      const { history, gestureBase, activeScreenId } = get();
+      const { history, gestureBase } = get();
       const base = gestureBase ?? history.present;
-      set({ gestureBase: base, history: replace(history, ops.updateScreen(history.present, activeScreenId, fn)) });
+      set({ gestureBase: base, history: replace(history, editFrame(history.present, fn)) });
     },
 
     endGesture() {
@@ -184,7 +214,12 @@ export const useWebDesign = create<WebDesignState>((set, get) => {
     },
 
     setActiveScreen(id) {
-      if (get().history.present.screens.some((s) => s.id === id)) set({ activeScreenId: id, selection: [] });
+      if (ops.getScreen(get().history.present, id)) set({ activeScreenId: id, selection: [] });
+    },
+
+    setActiveBreakpoint(id) {
+      const doc = get().history.present;
+      set({ activeBreakpoint: id && doc.breakpoints.some((b) => b.id === id) ? id : null });
     },
 
     select(ids) {
@@ -198,7 +233,7 @@ export const useWebDesign = create<WebDesignState>((set, get) => {
 
     reset(doc) {
       const wd = normalizeDoc(doc);
-      set({ history: createHistory(wd), activeScreenId: wd.screens[0].id, selection: [] });
+      set({ history: createHistory(wd), activeScreenId: wd.screens[0].id, activeBreakpoint: null, selection: [] });
     },
   };
 });
@@ -206,8 +241,22 @@ export const useWebDesign = create<WebDesignState>((set, get) => {
 // ---------- selectors ----------
 
 export const selectDoc = (s: WebDesignState) => s.history.present;
-export const selectScreen = (s: WebDesignState): WDScreen =>
-  s.history.present.screens.find((x) => x.id === s.activeScreenId) ?? s.history.present.screens[0];
+/** The base (unprojected) active frame: a screen or a component master. */
+export const selectBaseScreen = (s: WebDesignState): WDScreen => ops.getScreen(s.history.present, s.activeScreenId) ?? s.history.present.screens[0];
+
+/** The active frame as edited: projected to the active breakpoint when one is selected. Memoised. */
+export const selectScreen = (s: WebDesignState): WDScreen => {
+  const base = selectBaseScreen(s);
+  const doc = s.history.present;
+  if (!s.activeBreakpoint || ops.isComponent(doc, base.id)) return base;
+  return projectScreen(base, doc.breakpoints, s.activeBreakpoint);
+};
+
+export const selectEditingBreakpoint = (s: WebDesignState) => {
+  const doc = s.history.present;
+  if (!s.activeBreakpoint || ops.isComponent(doc, s.activeScreenId)) return null;
+  return doc.breakpoints.find((b) => b.id === s.activeBreakpoint) ?? null;
+};
 export const selectSelected = (s: WebDesignState): WDElement[] => {
   const screen = selectScreen(s);
   return s.selection.map((id) => screen.elements.find((e) => e.id === id)).filter((e): e is WDElement => !!e);

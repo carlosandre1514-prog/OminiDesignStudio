@@ -58,7 +58,7 @@ describe('React export', () => {
     const files = exportReactProject(doc, { tailwind: false }, 'Meu App');
     expect(files['src/screens/Inicio.tsx']).toContain('export default function Inicio');
     expect(files['src/screens/SobreNos.tsx']).toBeDefined();
-    expect(files['src/screens/Inicio.tsx']).toContain('onNavigate("SobreNos")');
+    expect(files['src/screens/Inicio.tsx']).toContain('onNavigate("SobreNos", null)');
     expect(JSON.parse(files['package.json']).name).toBe('meu-app');
     expect(files['src/styles.css']).toBeDefined();
   });
@@ -83,5 +83,78 @@ describe('ZIP export', () => {
     const blob = await zipFiles(files, 'site');
     const zip = await JSZip.loadAsync(blob);
     expect(Object.keys(zip.files).filter((f) => !f.endsWith('/')).sort()).toEqual(['site/app.js', 'site/index.html', 'site/sobre-nos.html', 'site/styles.css']);
+  });
+});
+
+describe('export of advanced features', () => {
+  async function advancedDoc() {
+    const { loadIcons } = await import('../icons');
+    await loadIcons();
+    const { createComponentFromSelection } = await import('../ops');
+    const doc = createEmptyDoc(1200, 800);
+    const s = doc.screens[0];
+    const other = createScreen('Destino', 1200, 800);
+    doc.screens.push(other);
+    const btn = createElement('button', 10, 10, {
+      text: 'Ir',
+      rotation: 15,
+      pressed: { fill: '#111111' },
+      focus: { textColor: '#00ff00' },
+      interaction: { type: 'navigate', screenId: other.id, transition: 'slide-left', duration: 400 },
+      overrides: { 'bp-mobile': { x: 5, y: 5, w: 100, h: 40, fontSize: 12 }, 'bp-tablet': { visible: false } },
+    });
+    const off = createElement('button', 10, 80, { text: 'Off', disabled: true, interaction: { type: 'navigate', screenId: other.id } });
+    const icon = createElement('icon', 200, 10, { iconName: 'House' });
+    const font = createElement('text', 10, 200, { style: { fontFamily: "'omni-font-ast_abc', system-ui, sans-serif" } as never });
+    const cardA = createElement('frame', 400, 400, { w: 100, h: 60 });
+    const cardB = createElement('text', 410, 410, { w: 80, h: 20, text: 'Mestre' });
+    s.elements.push(btn, off, icon, font, cardA, cardB);
+    const r = createComponentFromSelection(doc, s.id, [cardA.id, cardB.id], 'Cartão');
+    const d = r.doc;
+    const textId = d.components[0].elements[1].id;
+    d.screens[0].elements = d.screens[0].elements.map((e) => (e.id === r.instanceId ? { ...e, textOverrides: { [textId]: 'Sobrescrito' } } : e));
+    return { doc: d, btn, off, instId: r.instanceId! };
+  }
+
+  it('HTML/CSS: rotation, states, disabled, icons, media queries, instances, transitions and fonts', async () => {
+    const { doc, btn, instId } = await advancedDoc();
+    const files = exportHtmlProject(doc, { fonts: { ast_abc: { url: './assets/f.woff2', format: 'woff2' } } });
+    const css = files['styles.css'];
+    expect(css).toContain('transform: rotate(15deg)');
+    expect(css).toContain(`.el-${btn.id}:active {`);
+    expect(css).toContain(`.el-${btn.id}:focus-within {`);
+    expect(css).toMatch(/@font-face \{\n  font-family: 'omni-font-ast_abc';\n  src: url\('\.\/assets\/f\.woff2'\) format\('woff2'\)/);
+    expect(css).toContain('@keyframes omni-slide-left');
+    // Media queries come after base rules, max-width descending.
+    const tab = css.indexOf('@media (max-width: 1023px)');
+    const mob = css.indexOf('@media (max-width: 639px)');
+    expect(tab).toBeGreaterThan(css.indexOf(`.el-${btn.id} {`));
+    expect(mob).toBeGreaterThan(tab);
+    expect(css.slice(mob)).toMatch(/left: 5px;[\s\S]*right: auto;[\s\S]*font-size: 12px;/);
+    expect(css.slice(tab, mob)).toContain('display: none;');
+    const html = files['index.html'];
+    expect(html).toContain('data-transition="slide-left" data-duration="400"');
+    expect(html).toMatch(/<button class="el-[^"]+" type="button" disabled data-name="Botão"><\/button>|type="button" disabled/);
+    expect(html).not.toMatch(/disabled[^>]*data-navigate/);
+    expect(html).toContain('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"');
+    expect(html).toContain(`class="el-${instId}"`);
+    expect(html).toContain('Sobrescrito');
+    expect(html).not.toContain('Mestre');
+    expect(files['app.js']).toContain('omni-transition');
+  });
+
+  it('React/Tailwind: variants, nested instances and animations', async () => {
+    const { doc } = await advancedDoc();
+    const tw = exportReactProject(doc, { tailwind: true, fonts: { ast_abc: { url: '/assets/f.woff2', format: 'woff2' } } });
+    const screen = tw['src/screens/Inicio.tsx'] ?? tw[Object.keys(tw).find((k) => k.startsWith('src/screens/'))!];
+    expect(screen).toContain('active:[background-color:#111111]');
+    expect(screen).toContain('focus-within:[color:#00ff00]');
+    expect(screen).toContain('max-[639px]:[left:5px]');
+    expect(screen).toContain('max-[1023px]:hidden');
+    expect(screen).toContain('strokeWidth="2"');
+    expect(screen).toContain('Sobrescrito');
+    expect(screen).toContain('"omni-slide-left 400ms ease both"');
+    expect(tw['src/index.css']).toContain("font-family: 'omni-font-ast_abc'");
+    expect(tw['src/App.tsx']).toContain('screenAnim');
   });
 });

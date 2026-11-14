@@ -39,7 +39,7 @@ export async function importAssetFile(file: File, opts: ImportOptions = {}): Pro
 }
 
 /** Import raw bytes under a file name (used by file import and ZIP packages). */
-export async function importAssetBytes(fileName: string, data: ArrayBuffer, opts: ImportOptions & { name?: string } = {}): Promise<ImportResult> {
+export async function importAssetBytes(fileName: string, data: ArrayBuffer, opts: ImportOptions & { name?: string; thumbnail?: string } = {}): Promise<ImportResult> {
   const fmt = detectFormat(fileName);
   if (!fmt) return { status: 'error', fileName, error: `Formato ".${extOf(fileName) || '?'}" não suportado` };
   if (opts.maxSizeBytes && data.byteLength > opts.maxSizeBytes)
@@ -55,7 +55,9 @@ export async function importAssetBytes(fileName: string, data: ArrayBuffer, opts
     return { status: 'duplicate', fileName, asset: (await db.assets.get(existing.id))! };
   }
 
-  const { meta, thumbnail } = await analyzeMedia(fmt.kind, new Blob([data], { type: fmt.mime }));
+  const analyzed = await analyzeMedia(fmt.kind, new Blob([data], { type: fmt.mime }));
+  const meta = analyzed.meta;
+  const thumbnail = analyzed.thumbnail ?? (opts.thumbnail?.startsWith('data:image/') ? opts.thumbnail : undefined);
   const now = Date.now();
   const asset: Asset = {
     id: createId('ast'),

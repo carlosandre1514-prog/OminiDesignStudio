@@ -1,20 +1,23 @@
 import { createId } from '@/core/utils/id';
 import { createElement, createScreen, type WDElement, type WDScreen, type WebDesignDoc } from './model';
 
-export interface Rect {
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-}
+import { aabb, resolveConstraintBox as resolveBox, type Rect } from './geometry';
+
+export type { Rect };
 
 // ---------- screen helpers ----------
 
+/** Find a screen or a component master (both are frames with elements). */
 export function getScreen(doc: WebDesignDoc, screenId: string): WDScreen | undefined {
-  return doc.screens.find((s) => s.id === screenId);
+  return doc.screens.find((s) => s.id === screenId) ?? doc.components.find((c) => c.id === screenId);
+}
+
+export function isComponent(doc: WebDesignDoc, id: string): boolean {
+  return doc.components.some((c) => c.id === id);
 }
 
 export function updateScreen(doc: WebDesignDoc, screenId: string, fn: (s: WDScreen) => WDScreen): WebDesignDoc {
+  if (doc.components.some((c) => c.id === screenId)) return { ...doc, components: doc.components.map((c) => (c.id === screenId ? fn(c) : c)) };
   return { ...doc, screens: doc.screens.map((s) => (s.id === screenId ? fn(s) : s)) };
 }
 
@@ -42,6 +45,11 @@ export function duplicateScreen(doc: WebDesignDoc, screenId: string): { doc: Web
 
 export function removeScreen(doc: WebDesignDoc, screenId: string): WebDesignDoc {
   if (doc.screens.length <= 1) return doc;
+  const dropLinks = (s: WDScreen): WDScreen => ({
+    ...s,
+    elements: s.elements.map((e) => (e.interaction?.type === 'navigate' && e.interaction.screenId === screenId ? { ...e, interaction: null } : e)),
+  });
+  const components = doc.components.map(dropLinks);
   const screens = doc.screens
     .filter((s) => s.id !== screenId)
     .map((s) => ({
@@ -51,7 +59,7 @@ export function removeScreen(doc: WebDesignDoc, screenId: string): WebDesignDoc 
         e.interaction?.type === 'navigate' && e.interaction.screenId === screenId ? { ...e, interaction: null } : e,
       ),
     }));
-  return { ...doc, screens };
+  return { ...doc, screens, components };
 }
 
 export function moveScreen(doc: WebDesignDoc, screenId: string, delta: number): WebDesignDoc {
@@ -92,8 +100,9 @@ export function rootAncestor(screen: WDScreen, id: string): WDElement | undefine
   return el;
 }
 
-export function boundsOf(els: Pick<WDElement, 'x' | 'y' | 'w' | 'h'>[]): Rect | null {
-  if (!els.length) return null;
+export function boundsOf(input: (Pick<WDElement, 'x' | 'y' | 'w' | 'h'> & { rotation?: number })[]): Rect | null {
+  if (!input.length) return null;
+  const els = input.map(aabb);
   const x1 = Math.min(...els.map((e) => e.x));
   const y1 = Math.min(...els.map((e) => e.y));
   const x2 = Math.max(...els.map((e) => e.x + e.w));
@@ -389,4 +398,117 @@ export function smartSnap(rect: Rect, targets: Rect[], extraX: number[], extraY:
     ? [...new Set(ys.filter((l) => myY.some((m) => Math.abs(l - (m + dy)) < eps)))]
     : [];
   return { dx, dy, guidesX, guidesY };
+}
+
+// ---------- components (masters & instances) ----------
+
+/** Does component `compId` contain (directly or through nested instances) an instance of `targetId`? */
+export function componentDependsOn(doc: WebDesignDoc, compId: string, targetId: string, seen = new Set<string>()): boolean {
+  if (compId === targetId) return true;
+  if (seen.has(compId)) return false;
+  seen.add(compId);
+  const comp = doc.components.find((c) => c.id === compId);
+  return !!comp?.elements.some((e) => e.type === 'instance' && e.componentId && componentDependsOn(doc, e.componentId, targetId, seen));
+}
+
+/** Can an instance of `compId` be placed inside frame `frameId` without creating a cycle? */
+export function canInsertInstance(doc: WebDesignDoc, frameId: string, compId: string): boolean {
+  if (!doc.components.some((c) => c.id === compId)) return false;
+  return !isComponent(doc, frameId) || !componentDependsOn(doc, compId, frameId);
+}
+
+/** Turn the selected elements into a reusable component; they are replaced by an instance. */
+export function createComponentFromSelection(
+  doc: WebDesignDoc,
+  frameId: string,
+  ids: string[],
+  name = 'Componente',
+): { doc: WebDesignDoc; componentId?: string; instanceId?: string } {
+  const frame = getScreen(doc, frameId);
+  if (!frame) return { doc };
+  const roots = ids.filter((id) => frame.elements.some((e) => e.id === id));
+  if (!roots.length) return { doc };
+  const rootEls = frame.elements.filter((e) => roots.includes(e.id));
+  const parentId = rootEls[0].parentId;
+  if (!rootEls.every((e) => e.parentId === parentId)) return { doc };
+  const b = boundsOf(rootEls)!;
+  const comp = createScreen(name, Math.max(1, Math.round(b.w)), Math.max(1, Math.round(b.h)));
+  comp.background = 'transparent';
+  comp.elements = cloneElements(frame, roots).map((e) => ({
+    ...e,
+    x: e.x - b.x,
+    y: e.y - b.y,
+    parentId: roots.includes(e.parentId ?? '') || !e.parentId || !frame.elements.some((p) => p.id === e.parentId) ? e.parentId : null,
+    initiallyHidden: false,
+    // Breakpoint adjustments only apply to screens; inside components the constraints drive the layout.
+    overrides: undefined,
+  }));
+  // Roots of the clone become top-level in the component.
+  const cloneIds = new Set(comp.elements.map((e) => e.id));
+  comp.elements = comp.elements.map((e) => (e.parentId && !cloneIds.has(e.parentId) ? { ...e, parentId: null } : e));
+  const inst = createElement('instance', b.x, b.y, { w: b.w, h: b.h, parentId, componentId: comp.id, name });
+  const lastIdx = Math.max(...rootEls.map((e) => frame.elements.indexOf(e)));
+  const withoutSel = deleteElements(frame, roots);
+  // Insert the instance where the top-most selected element was (z-order preserved).
+  const before = frame.elements.slice(0, lastIdx + 1).filter((e) => withoutSel.elements.some((w) => w.id === e.id)).length;
+  const elements = [...withoutSel.elements];
+  elements.splice(before, 0, inst);
+  const nextDoc = updateScreen({ ...doc, components: [...doc.components, comp] }, frameId, () => refreshGroups({ ...withoutSel, elements }));
+  return { doc: nextDoc, componentId: comp.id, instanceId: inst.id };
+}
+
+export function insertInstance(doc: WebDesignDoc, frameId: string, compId: string, x: number, y: number): { doc: WebDesignDoc; instanceId?: string } {
+  const comp = doc.components.find((c) => c.id === compId);
+  if (!comp || !canInsertInstance(doc, frameId, compId)) return { doc };
+  const inst = createElement('instance', x, y, { w: comp.width, h: comp.height, componentId: compId, name: comp.name });
+  return { doc: updateScreen(doc, frameId, (s) => addElements(s, [inst])), instanceId: inst.id };
+}
+
+/** Replace an instance by independent copies of the component's elements (grouped when several). */
+export function detachInstance(doc: WebDesignDoc, frameId: string, instId: string): { doc: WebDesignDoc; ids: string[] } {
+  const frame = getScreen(doc, frameId);
+  const inst = frame?.elements.find((e) => e.id === instId && e.type === 'instance');
+  const comp = inst && doc.components.find((c) => c.id === inst.componentId);
+  if (!frame || !inst || !comp) return { doc, ids: [] };
+  const items = materializeExact(comp, inst);
+  let s = deleteElements(frame, [instId]);
+  s = addElements(s, items.map((e) => (e.parentId ? e : { ...e, parentId: inst.parentId })));
+  let ids = items.filter((e) => !items.some((o) => o.id === e.parentId)).map((e) => e.id);
+  if (ids.length > 1) {
+    const g = groupElements(s, ids);
+    s = g.screen;
+    if (g.groupId) {
+      s = updateElements(s, [g.groupId], () => ({ name: inst.name }));
+      ids = [g.groupId];
+    }
+  }
+  return { doc: updateScreen(doc, frameId, () => s), ids };
+}
+
+/** Exact copy of a component's elements positioned like the instance renders them. */
+function materializeExact(comp: WDScreen, inst: WDElement): WDElement[] {
+  const idMap = new Map(comp.elements.map((e) => [e.id, createId('el')]));
+  return comp.elements.map((e) => {
+    const r = e.type === 'group' ? null : resolveBox(e, comp.width, comp.height, inst.w, inst.h);
+    const text = inst.textOverrides?.[e.id];
+    return {
+      ...structuredClone(e),
+      id: idMap.get(e.id)!,
+      parentId: e.parentId ? idMap.get(e.parentId) ?? null : null,
+      ...(r ? { x: inst.x + r.x, y: inst.y + r.y, w: r.w, h: r.h } : {}),
+      ...(text !== undefined ? { text } : {}),
+      interaction:
+        e.interaction?.type === 'toggle' && idMap.has(e.interaction.targetId) ? { ...e.interaction, targetId: idMap.get(e.interaction.targetId)! } : e.interaction,
+    };
+  });
+}
+
+/** Delete a component master. Its instances are detached first, so no content is lost. */
+export function deleteComponent(doc: WebDesignDoc, compId: string): WebDesignDoc {
+  let d = doc;
+  for (const frame of [...d.screens, ...d.components]) {
+    if (frame.id === compId) continue;
+    for (const inst of frame.elements.filter((e) => e.type === 'instance' && e.componentId === compId)) d = detachInstance(d, frame.id, inst.id).doc;
+  }
+  return { ...d, components: d.components.filter((c) => c.id !== compId) };
 }

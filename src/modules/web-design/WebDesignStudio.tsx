@@ -4,13 +4,17 @@ import { db } from '@/core/db/database';
 import { createVersion } from '@/core/projects/projectService';
 import type { ModuleEditorProps } from '@/core/modules/registry';
 import { toast } from '@/ui/toast';
+import { ensureAssetFont } from '@/core/assets/assetUrls';
 import { Canvas } from './components/Canvas';
+import { ComponentsContext } from './components/ElementView';
+import { docFontAssetIds } from './fonts';
 import { ExportDialog } from './components/ExportDialog';
 import { LeftPanel } from './components/LeftPanel';
 import { PreviewMode } from './components/PreviewMode';
 import { PropertiesPanel } from './components/PropertiesPanel';
+import { makeComponentFromSelection } from './components/ExtraProps';
 import * as ops from './ops';
-import { copySelection, hasClipboard, pasteClipboard, selectDoc, selectScreen, useWebDesign } from './store';
+import { copySelection, hasClipboard, pasteClipboard, selectDoc, selectEditingBreakpoint, selectScreen, useWebDesign } from './store';
 import { useView } from './viewStore';
 
 const isTyping = (t: EventTarget | null) =>
@@ -56,6 +60,14 @@ export default function WebDesignStudio({ projectId }: ModuleEditorProps) {
   const activeScreenId = useWebDesign((s) => s.activeScreenId);
   const selection = useWebDesign((s) => s.selection);
   const { zoom, tool, showRulers } = useView();
+  const activeBp = useWebDesign((s) => s.activeBreakpoint);
+  const editingBp = useWebDesign(selectEditingBreakpoint);
+  const isComp = useWebDesign((s) => ops.isComponent(s.history.present, s.activeScreenId));
+  const fontKey = docFontAssetIds(doc).join(',');
+  useEffect(() => {
+    // Register library fonts used by the document so the canvas renders them.
+    for (const id of fontKey.split(',').filter(Boolean)) void ensureAssetFont(id);
+  }, [fontKey]);
   const projectName = useLiveQuery(() => db.projects.get(projectId).then((p) => p?.name ?? 'projeto'), [projectId]) ?? 'projeto';
   const [preview, setPreview] = useState<null | 'proto' | 'showcase'>(null);
   const [exporting, setExporting] = useState(false);
@@ -76,7 +88,7 @@ export default function WebDesignStudio({ projectId }: ModuleEditorProps) {
 
   useEffect(() => {
     requestAnimationFrame(fitToScreen);
-  }, [activeScreenId]);
+  }, [activeScreenId, activeBp]);
 
   // Keyboard shortcuts.
   useEffect(() => {
@@ -86,7 +98,10 @@ export default function WebDesignStudio({ projectId }: ModuleEditorProps) {
       const mod = e.ctrlKey || e.metaKey;
       const k = e.key.toLowerCase();
       const sel = st.selection;
-      if (mod && k === 'z') {
+      if (mod && e.altKey && (k === 'k' || e.code === 'KeyK')) {
+        e.preventDefault();
+        makeComponentFromSelection();
+      } else if (mod && k === 'z') {
         e.preventDefault();
         if (e.shiftKey) st.redo();
         else st.undo();
@@ -172,7 +187,14 @@ export default function WebDesignStudio({ projectId }: ModuleEditorProps) {
   const st = useWebDesign.getState();
 
   return (
+    <ComponentsContext.Provider value={doc.components}>
     <div className="flex h-full flex-col">
+      {editingBp && (
+        <div className="flex items-center gap-2 bg-cyan-500/10 px-3 py-1 text-xs text-cyan-200">
+          Editando o breakpoint <strong>{editingBp.name}</strong> ({editingBp.mode === 'max' ? 'até' : 'a partir de'} {editingBp.width}px): posição, tamanho, visibilidade e tamanho da fonte viram ajustes deste breakpoint; as demais propriedades são compartilhadas.
+          <button className="ml-auto underline" onClick={() => st.setActiveBreakpoint(null)}>Voltar à base</button>
+        </div>
+      )}
       <div className="flex items-center gap-1 overflow-x-auto border-b border-ink-800 bg-ink-900 px-2 py-1">
         <button className="icon-btn lg:hidden" onClick={() => setPanel(panel === 'left' ? null : 'left')} aria-label="Telas e camadas" title="Telas e camadas">☰</button>
         <button className="icon-btn" data-active={tool === 'select'} onClick={() => useView.getState().setTool('select')} title="Selecionar (V)" aria-label="Ferramenta de seleção">➤</button>
@@ -206,6 +228,20 @@ export default function WebDesignStudio({ projectId }: ModuleEditorProps) {
         <button className="min-w-12 rounded px-1 text-xs text-ink-300 hover:bg-ink-800" onClick={fitToScreen} title="Ajustar à tela (Shift+1)">{Math.round(zoom * 100)}%</button>
         <button className="icon-btn" onClick={() => zoomBy(1.2)} title="Aumentar zoom (+)" aria-label="Aumentar zoom">+</button>
         <button className="icon-btn" data-active={showRulers} onClick={() => useView.getState().toggleRulers()} title="Réguas" aria-label="Mostrar réguas">📏</button>
+        <span className="mx-1 h-5 w-px bg-ink-700" />
+        <select
+          className="input w-auto py-1 text-xs"
+          aria-label="Breakpoint"
+          title={isComp ? 'Componentes usam constraints; breakpoints valem para telas' : 'Editar o layout base ou ajustes manuais de um breakpoint'}
+          disabled={isComp}
+          value={activeBp ?? ''}
+          onChange={(e) => st.setActiveBreakpoint(e.target.value || null)}
+        >
+          <option value="">Layout base</option>
+          {doc.breakpoints.map((b) => (
+            <option key={b.id} value={b.id}>{b.name} ({b.mode === 'max' ? '≤' : '≥'}{b.width}px)</option>
+          ))}
+        </select>
         <button className="icon-btn" data-active={doc.grid.show} onClick={() => st.apply((d) => ({ ...d, grid: { ...d.grid, show: !d.grid.show } }))} title="Grid" aria-label="Mostrar grid">#</button>
         <div className="ml-auto flex items-center gap-1.5 pl-2">
           <SaveIndicator />
@@ -240,6 +276,7 @@ export default function WebDesignStudio({ projectId }: ModuleEditorProps) {
       {preview && <PreviewMode doc={doc} startScreenId={preview === 'showcase' ? doc.screens[0].id : activeScreenId} showcase={preview === 'showcase'} onClose={() => setPreview(null)} />}
       {exporting && <ExportDialog doc={doc} projectName={projectName} onClose={() => setExporting(false)} />}
     </div>
+    </ComponentsContext.Provider>
   );
 }
 

@@ -10,7 +10,8 @@ import { DEVICE_PRESETS } from '../layout';
 import type { ConstraintH, ConstraintV, Interaction, WDElement, WDStyle } from '../model';
 import { ELEMENT_LABELS } from '../model';
 import * as ops from '../ops';
-import { selectDoc, selectScreen, selectSelected, useWebDesign } from '../store';
+import { selectBaseScreen, selectDoc, selectScreen, selectSelected, useWebDesign } from '../store';
+import { BreakpointOverrideInfo, BreakpointsSection, FontSelect, IconField, InstanceSection, makeComponentFromSelection, StatesSection, TransitionFields } from './ExtraProps';
 import { ColorField, NumField, Section, TextField } from './fields';
 
 const st = () => useWebDesign.getState();
@@ -28,13 +29,16 @@ const styleLive = (p: Partial<WDStyle>) => liveSel(() => ({ style: p as WDStyle 
 const end = () => st().endGesture();
 
 function ScreenProps() {
-  const screen = useWebDesign(selectScreen);
+  // Frame properties always edit the base frame (not the breakpoint projection).
+  const screen = useWebDesign(selectBaseScreen);
+  const isComp = useWebDesign((s) => ops.isComponent(s.history.present, s.activeScreenId));
   const grid = useWebDesign((s) => selectDoc(s).grid);
-  const set = (p: Partial<typeof screen>) => st().applyScreen((s) => ({ ...s, ...p }));
+  const set = (p: Partial<typeof screen>) => st().apply((d) => ops.updateScreen(d, screen.id, (s) => ({ ...s, ...p })));
   const setGrid = (p: Partial<typeof grid>) => st().apply((d) => ({ ...d, grid: { ...d.grid, ...p } }));
   return (
     <>
-      <Section title="Tela">
+      <Section title={isComp ? 'Componente (mestre)' : 'Tela'}>
+        {isComp && <p className="text-[11px] leading-relaxed text-ink-400">Alterações aqui aparecem em todas as instâncias. Use as constraints dos elementos para definir como eles se ajustam quando uma instância é redimensionada.</p>}
         <TextField label="Nome" value={screen.name} onCommit={(name) => set({ name: name || screen.name })} />
         <div className="grid grid-cols-2 gap-1.5">
           <NumField label="L" title="Largura" value={screen.width} min={50} max={10000} onCommit={(width) => set({ width })} />
@@ -57,6 +61,7 @@ function ScreenProps() {
           <button className="btn-ghost w-full text-xs" onClick={() => set({ guides: { x: [], y: [] } })}>Remover guias ({screen.guides.x.length + screen.guides.y.length})</button>
         )}
       </Section>
+      {!isComp && <BreakpointsSection />}
       <Section title="Grid">
         <div className="grid grid-cols-2 gap-1.5">
           <NumField label="px" title="Tamanho do grid" value={grid.size} min={1} max={256} onCommit={(size) => setGrid({ size })} />
@@ -137,6 +142,9 @@ function ElementProps({ el, multi = false }: { el: WDElement; multi?: boolean })
           <NumField label="Y" value={el.y} onCommit={(y) => setBox({ y })} />
           <NumField label="L" title="Largura" value={el.w} min={1} onCommit={(w) => setBox({ w })} />
           <NumField label="A" title="Altura" value={el.h} min={1} onCommit={(h) => setBox({ h })} />
+          {el.type !== 'group' && (
+            <NumField label="R°" title="Rotação (graus)" value={el.rotation} min={-180} max={180} onCommit={(rotation) => patchSel(() => ({ rotation }))} />
+          )}
         </div>
         <div className="flex gap-3 text-xs">
           <label className="flex items-center gap-1.5"><input type="checkbox" checked={el.locked} onChange={(e) => patchSel(() => ({ locked: e.target.checked }))} /> Bloqueado</label>
@@ -170,8 +178,12 @@ function ElementProps({ el, multi = false }: { el: WDElement; multi?: boolean })
         <p className="text-[11px] text-ink-400">Define como o elemento se ajusta quando a largura/altura da tela muda (pré-visualização e código exportado).</p>
       </Section>
 
-      {el.type !== 'group' && !multi && (
+      {el.type === 'instance' && !multi && <InstanceSection el={el} />}
+      {!multi && <BreakpointOverrideInfo el={el} />}
+
+      {el.type !== 'group' && el.type !== 'instance' && !multi && (
         <Section title="Conteúdo">
+          {el.type === 'icon' && <IconField el={el} />}
           {hasText && el.type !== 'input' && <TextField label={el.type === 'card' || el.type === 'modal' ? 'Título' : el.type === 'navbar' ? 'Marca' : 'Texto'} value={el.text ?? ''} multiline={el.type === 'text'} onCommit={(text) => patchSel(() => ({ text }))} />}
           {(el.type === 'card' || el.type === 'modal') && <TextField label="Descrição" value={el.subtext ?? ''} multiline onCommit={(subtext) => patchSel(() => ({ subtext }))} />}
           {el.type === 'input' && (
@@ -218,12 +230,7 @@ function ElementProps({ el, multi = false }: { el: WDElement; multi?: boolean })
                   {[300, 400, 500, 600, 700, 800].map((w) => <option key={w} value={w}>Peso {w}</option>)}
                 </select>
               </div>
-              <select className="input py-1 text-xs" aria-label="Fonte" value={s.fontFamily} onChange={(e) => styleCommit({ fontFamily: e.target.value })}>
-                <option value="Inter, system-ui, sans-serif">Inter / Sans</option>
-                <option value="Georgia, 'Times New Roman', serif">Serif</option>
-                <option value="ui-monospace, 'SFMono-Regular', monospace">Monospace</option>
-                <option value="'Trebuchet MS', Helvetica, sans-serif">Humanista</option>
-              </select>
+              <FontSelect value={s.fontFamily} onChange={(fontFamily) => styleCommit({ fontFamily })} />
               <div className="grid grid-cols-3 gap-1">
                 {(['left', 'center', 'right'] as const).map((a) => (
                   <button key={a} className="icon-btn h-7 w-full text-xs" data-active={s.textAlign === a} onClick={() => styleCommit({ textAlign: a })}>
@@ -261,24 +268,7 @@ function ElementProps({ el, multi = false }: { el: WDElement; multi?: boolean })
         </Section>
       )}
 
-      {el.type !== 'group' && (
-        <Section
-          title="Estado: hover"
-          right={
-            <input type="checkbox" aria-label="Ativar estado hover" checked={!!el.hover} onChange={(e) => patchSel(() => ({ hover: e.target.checked ? { fill: s.fill, textColor: s.textColor } : null }))} />
-          }
-        >
-          {el.hover ? (
-            <>
-              <ColorField label="Preench." value={el.hover.fill ?? s.fill} onLive={(fill) => liveSel((x) => ({ hover: { ...x.hover, fill } }))} onEnd={end} onCommit={(fill) => patchSel((x) => ({ hover: { ...x.hover, fill: safeColor(fill, s.fill) } }))} />
-              <ColorField label="Texto" value={el.hover.textColor ?? s.textColor} onLive={(textColor) => liveSel((x) => ({ hover: { ...x.hover, textColor } }))} onEnd={end} onCommit={(textColor) => patchSel((x) => ({ hover: { ...x.hover, textColor: safeColor(textColor, s.textColor) } }))} />
-              {s.borderWidth > 0 && <ColorField label="Borda" value={el.hover.borderColor ?? s.borderColor} onLive={(borderColor) => liveSel((x) => ({ hover: { ...x.hover, borderColor } }))} onEnd={end} onCommit={(borderColor) => patchSel((x) => ({ hover: { ...x.hover, borderColor: safeColor(borderColor, s.borderColor) } }))} />}
-            </>
-          ) : (
-            <p className="text-[11px] text-ink-400">Ative para definir cores ao passar o mouse (aplicado no protótipo e no código).</p>
-          )}
-        </Section>
-      )}
+      {el.type !== 'group' && <StatesSection el={el} />}
 
       <Section title="Interação (protótipo)">
         <select
@@ -295,18 +285,25 @@ function ElementProps({ el, multi = false }: { el: WDElement; multi?: boolean })
         >
           <option value="">Nenhuma</option>
           <option value="navigate">Ao clicar: ir para tela</option>
-          <option value="toggle">Ao clicar: mostrar/ocultar elemento</option>
+          <option value="toggle" disabled={ops.isComponent(doc, screen.id)}>Ao clicar: mostrar/ocultar elemento{ops.isComponent(doc, screen.id) ? ' (somente em telas)' : ''}</option>
           <option value="url">Ao clicar: abrir link externo</option>
         </select>
         {interaction?.type === 'navigate' && (
-          <select className="input py-1 text-xs" aria-label="Tela de destino" value={interaction.screenId} onChange={(e) => setInteraction({ type: 'navigate', screenId: e.target.value })}>
-            {doc.screens.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
-          </select>
+          <>
+            <select className="input py-1 text-xs" aria-label="Tela de destino" value={interaction.screenId} onChange={(e) => setInteraction({ ...interaction, screenId: e.target.value })}>
+              {doc.screens.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+            </select>
+            <TransitionFields interaction={interaction} onChange={setInteraction} />
+          </>
         )}
         {interaction?.type === 'toggle' && (
-          <select className="input py-1 text-xs" aria-label="Elemento alvo" value={interaction.targetId} onChange={(e) => setInteraction({ type: 'toggle', targetId: e.target.value })}>
-            {toggleTargets.map((x) => <option key={x.id} value={x.id}>{x.name}{x.id === el.id ? ' (este)' : ''}</option>)}
-          </select>
+          <>
+            <select className="input py-1 text-xs" aria-label="Elemento alvo" value={interaction.targetId} onChange={(e) => setInteraction({ ...interaction, targetId: e.target.value })}>
+              {toggleTargets.map((x) => <option key={x.id} value={x.id}>{x.name}{x.id === el.id ? ' (este)' : ''}</option>)}
+            </select>
+            <TransitionFields interaction={interaction} onChange={setInteraction} />
+            <p className="text-[11px] text-ink-400">A transição é aplicada quando o elemento aparece.</p>
+          </>
         )}
         {interaction?.type === 'url' && <TextField label="Endereço (http/https)" value={interaction.href} onCommit={(href) => setInteraction({ type: 'url', href })} />}
         <label className="flex items-center gap-2 text-xs">
@@ -338,7 +335,10 @@ export function PropertiesPanel() {
           }}>
             Agrupar (Ctrl+G)
           </button>
-          {!sameParent && <p className="text-[11px] text-ink-400">Para agrupar, selecione elementos do mesmo nível.</p>}
+          <button className="btn-outline w-full text-xs" disabled={!sameParent} onClick={makeComponentFromSelection}>
+            Criar componente (Ctrl+Alt+K)
+          </button>
+          {!sameParent && <p className="text-[11px] text-ink-400">Para agrupar ou criar componente, selecione elementos do mesmo nível.</p>}
         </Section>
         <ElementProps el={selected[0]} multi />
       </>
@@ -362,6 +362,11 @@ export function PropertiesPanel() {
             Desagrupar (Ctrl+Shift+G)
           </button>
           <p className="text-[11px] text-ink-400">Clique duplo em um filho no canvas para selecioná-lo dentro do grupo.</p>
+        </Section>
+      )}
+      {el.type !== 'instance' && (
+        <Section title="Componente">
+          <button className="btn-outline w-full text-xs" onClick={makeComponentFromSelection}>Criar componente a partir da seleção</button>
         </Section>
       )}
       <ElementProps el={el} />
