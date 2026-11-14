@@ -347,6 +347,8 @@ function Lighting({ env }: { env: Scene3DDoc['environment'] }) {
         <Environment resolution={256} background={bgEnv} environmentIntensity={env.envIntensity}>
           {env.preset === 'studio' && (
             <>
+              {/* Neutral grey surroundings so polished metal reflects something instead of black. */}
+              <color attach="background" args={['#3b404b']} />
               <Lightformer form="rect" intensity={3} position={[0, 4, 3]} scale={[6, 2, 1]} />
               <Lightformer form="rect" intensity={1.5} position={[-5, 1, -1]} rotation-y={Math.PI / 2} scale={[4, 3, 1]} />
               <Lightformer form="rect" intensity={1.5} position={[5, 1, -1]} rotation-y={-Math.PI / 2} scale={[4, 3, 1]} />

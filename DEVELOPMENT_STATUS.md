@@ -82,6 +82,7 @@ _Última atualização: 2026-11-14 (Fase 4 — 3D Design Studio)_
 - **Exportação**: GLB e GLTF (geometria, hierarquia, transformações, materiais, texturas e luzes), OBJ, STL, PNG da vista (1× ou 2×, fundo transparente opcional); exportar tudo ou só a seleção.
 - **Apresentação**: tela limpa com rotação automática, tela cheia e captura de imagem.
 - Desfazer/refazer, salvamento automático, versões, miniatura do projeto, sincronização em nuvem e pacotes de projeto (texturas, modelos e HDRI referenciados como `asset:<id>`).
+- **Gerador de armas 3D procedural** (sem API, sem IA externa, roda no celular): 20 tipos em 4 categorias — brancas/medievais (espada longa, katana, adaga, machado, lança, martelo de guerra, escudo), armas de fogo (pistola, fuzil de assalto, espingarda, rifle de precisão, submetralhadora), arco e flecha (arco recurvo, arco longo, besta, flecha) e sci-fi/fantasia (espada de energia, rifle de plasma, pistola laser, cajado mágico). Cada tipo tem parâmetros com dimensões reais (cm), opções de forma, variação aleatória com semente e pré-visualização 3D girando. Geometria construída com torno, loft de seções reais (lâmina losangular/lenticular, sulco, gume único curvo), extrusão de contornos com furos, tubos por curva e caixas chanfradas; todas as peças são malhas fechadas e editáveis. Suavização automática (35°) mantém arestas vivas. **Texturas PBR procedurais** (cor, rugosidade e normal coerentes, sem emendas): aço polido/enegrecido/damasco/gasto, ouro, latão, bronze, madeiras, couro, tecido trançado, borracha, polímeros, com controle de desgaste (arranhões e sujeira); energia emissiva. Ao adicionar, as texturas vão para a Asset Library e a arma vira um grupo de peças com materiais na cena (exportável em GLB/GLTF/OBJ/STL).
 
 ### ✅ Publicação
 - GitHub Pages via GitHub Actions (`.github/workflows/pages.yml`): testes + build no subcaminho `/OminiDesignStudio/` + deploy a cada push. Supabase do projeto configurado no build.
@@ -97,6 +98,7 @@ Fase 4 (3D) — ainda não implementado:
 - Transformar vários objetos de uma vez pelo gizmo (hoje: um objeto por vez; alinhar/espelhar/agrupar funcionam em lote).
 - WebGPU (o viewport usa WebGL) e física (Rapier, prevista junto ao Game Design Studio).
 - Salvar materiais como assets da biblioteca (prefabs dependem da Fase 5).
+- Gerador de armas: cria a partir de tipos e parâmetros, não a partir de texto livre ou foto (como o Meshy faz com IA na nuvem); novos tipos são adicionados ao catálogo em código.
 - Loop cut testado em testes unitários; no navegador depende de clicar exatamente na aresta (sem teste automatizado de clique).
 
 - Restante da Fase 6: sistema de plugins, otimizações e testes de integração adicionais.

@@ -1,9 +1,11 @@
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { AssetPicker } from '@/modules/asset-library/AssetPicker';
 import { toast } from '@/ui/toast';
 import { createGroup, createLight, createModel, createPrimitive, LIGHT_LABELS, PRIMITIVE_LABELS, type LightKind, type Obj3D, type Primitive } from '../model';
 import * as ops from '../ops';
 import { selectScene, useStudio3D } from '../store';
+
+const WeaponGenerator = lazy(() => import('./WeaponGenerator').then((m) => ({ default: m.WeaponGenerator })));
 
 const ICON: Record<Obj3D['type'], string> = { mesh: '◆', group: '▣', light: '☀', model: '⬢' };
 const st = () => useStudio3D.getState();
@@ -88,6 +90,7 @@ export function Outliner() {
   const doc = useStudio3D(selectScene);
   const projectId = useStudio3D((s) => s.projectId);
   const [picking, setPicking] = useState(false);
+  const [weapons, setWeapons] = useState(false);
   const roots = doc.objects.filter((o) => !o.parentId);
   return (
     <div className="flex h-full flex-col">
@@ -112,7 +115,8 @@ export function Outliner() {
           </select>
           <button className="rounded px-1 py-1 text-[11px] text-ink-300 hover:bg-ink-800" onClick={() => addObject(createGroup())}>+ Grupo vazio</button>
         </div>
-        <button className="btn-outline mt-2 w-full text-xs" onClick={() => setPicking(true)}>Importar modelo 3D…</button>
+        <button className="btn-primary mt-2 w-full text-xs" onClick={() => setWeapons(true)} data-testid="open-weapon-generator">⚔ Gerador de armas 3D</button>
+        <button className="btn-outline mt-1 w-full text-xs" onClick={() => setPicking(true)}>Importar modelo 3D…</button>
         <p className="mt-1 text-[10px] leading-snug text-ink-400">GLB, GLTF, OBJ (+MTL), FBX e STL — ficam salvos na Asset Library.</p>
       </section>
       <section className="flex min-h-0 flex-1 flex-col p-3">
@@ -121,6 +125,11 @@ export function Outliner() {
           {roots.map((o) => <Row key={o.id} o={o} depth={0} />)}
         </ul>
       </section>
+      {weapons && (
+        <Suspense fallback={null}>
+          <WeaponGenerator onClose={() => setWeapons(false)} />
+        </Suspense>
+      )}
       {picking && (
         <AssetPicker
           kinds={['model3d']}

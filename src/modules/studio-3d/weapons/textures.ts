@@ -217,7 +217,7 @@ function sampler(p: Pattern) {
       case 'blackened': {
         const n = fbm(u, v, 8, 8);
         mix = n * 0.6 + fbm2(u, v, 32, 32, 2) * 0.4;
-        h = 0.5 + (fbm(u, v, 64, 64, 2) - 0.5) * 0.25;
+        h = 0.5 + (fbm(u, v, 32, 32, 2) - 0.5) * 0.15;
         rough = mix;
         break;
       }
@@ -267,8 +267,8 @@ function sampler(p: Pattern) {
         break;
       }
       case 'polymer': {
-        const n = fbm(u, v, 128, 128, 2);
-        h = 0.5 + (n - 0.5) * 0.6;
+        const n = fbm(u, v, 64, 64, 2);
+        h = 0.5 + (n - 0.5) * 0.25;
         mix = 0.45 + (fbm2(u, v, 6, 6) - 0.5) * 0.4 + (n - 0.5) * 0.2;
         rough = 0.5 + n * 0.5;
         break;
@@ -317,6 +317,9 @@ function scratchMask(p: Pattern, size: number): Float32Array {
   return mask;
 }
 
+/** Normal-map strength per pattern: fine finishes get subtle relief, cord wraps and leather get more. */
+const BUMP: Record<Pattern['kind'], number> = { brushed: 1.2, damascus: 1.5, blackened: 0.8, hammered: 2.5, wood: 1.6, leather: 2.2, wrap: 3, rubber: 1.8, polymer: 0.6, rust: 2.5 };
+
 export function synthesize(p: Pattern, size = 256): TextureSet {
   const sample = sampler(p);
   const N = size * size;
@@ -346,7 +349,7 @@ export function synthesize(p: Pattern, size = 256): TextureSet {
       roughness[i * 4 + 3] = 255;
     }
   // Normal map from the height field (Sobel, wrapped so the texture still tiles).
-  const strength = 6;
+  const strength = BUMP[p.kind];
   const H = (x: number, y: number) => height[((y + size) % size) * size + ((x + size) % size)];
   for (let y = 0; y < size; y++)
     for (let x = 0; x < size; x++) {

@@ -1,5 +1,5 @@
 import { useLiveQuery } from 'dexie-react-hooks';
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { db } from '@/core/db/database';
 import type { ModuleEditorProps } from '@/core/modules/registry';
 import { createVersion } from '@/core/projects/projectService';
@@ -11,6 +11,8 @@ import { Viewport } from './components/Viewport';
 import * as P from './mesh/polyMesh';
 import * as ops from './ops';
 import { selectEditObject, selectScene, selectedVertexIds, useStudio3D, type GizmoMode, type ViewShading } from './store';
+
+const WeaponGenerator = lazy(() => import('./components/WeaponGenerator').then((m) => ({ default: m.WeaponGenerator })));
 
 const isTyping = (t: EventTarget | null) => t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t instanceof HTMLSelectElement;
 const st = () => useStudio3D.getState();
@@ -63,6 +65,7 @@ export default function Studio3D({ projectId }: ModuleEditorProps) {
   const projectName = useLiveQuery(() => db.projects.get(projectId).then((p) => p?.name ?? 'cena'), [projectId]) ?? 'cena';
   const [exporting, setExporting] = useState(false);
   const [panel, setPanel] = useState<'left' | 'right' | null>(null);
+  const [weapons, setWeapons] = useState(false);
 
   useEffect(() => {
     void st().load(projectId);
@@ -229,6 +232,12 @@ export default function Studio3D({ projectId }: ModuleEditorProps) {
         </aside>
         <div className="relative min-w-0 flex-1 bg-ink-950" data-testid="viewport-wrap">
           <Viewport />
+          <button className="btn-primary absolute bottom-3 left-3 z-10 text-xs shadow-lg lg:hidden" onClick={() => setWeapons(true)} data-testid="weapon-fab">⚔ Gerar arma</button>
+          {weapons && (
+            <Suspense fallback={null}>
+              <WeaponGenerator onClose={() => setWeapons(false)} />
+            </Suspense>
+          )}
           {mode === 'edit' && <div className="pointer-events-none absolute left-3 top-3 rounded bg-amber-500/90 px-2 py-0.5 text-xs font-medium text-black">Modo edição</div>}
         </div>
         <aside className={`${panel === 'right' ? 'absolute inset-y-0 right-0 z-30 block shadow-2xl' : 'hidden'} w-72 shrink-0 overflow-y-auto border-l border-ink-800 bg-ink-900 lg:static lg:block`} data-testid="inspector-3d">
