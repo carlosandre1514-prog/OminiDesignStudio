@@ -45,10 +45,23 @@ function Preview({ asset }: { asset: Asset }) {
         <p className="text-xs text-ink-400">Componente de interface reutilizável. Insira-o no Web &amp; App Design pelo painel "Componentes" → "Da biblioteca".</p>
       </div>
     );
+  if (asset.kind === 'hdri')
+    return (
+      <div className="rounded bg-ink-850 p-4 text-center text-xs text-ink-400">
+        <div className="text-3xl">☀</div>
+        Ambiente HDRI. Use no 3D Design Studio em Ambiente → "HDRI da biblioteca".
+      </div>
+    );
   return (
-    <div className="rounded bg-ink-850 p-4 text-center text-xs text-ink-400">
-      <div className="text-3xl">◈</div>
-      Arquivo 3D armazenado. A visualização 3D chega com o 3D Design Studio (Fase 4).
+    <div className="space-y-2">
+      {asset.thumbnail ? (
+        <img src={asset.thumbnail} alt={asset.name} className="max-h-64 w-full rounded bg-ink-850 object-contain" />
+      ) : (
+        <div className="rounded bg-ink-850 p-4 text-center text-3xl text-ink-400">◈</div>
+      )}
+      <p className="text-xs text-ink-400">
+        {asset.ext === 'mtl' ? 'Materiais de um .obj — usados automaticamente ao importar o .obj de mesmo nome.' : 'Modelo 3D. Adicione a uma cena no 3D Design Studio em "Importar modelo 3D…".'}
+      </p>
     </div>
   );
 }

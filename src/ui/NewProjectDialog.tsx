@@ -71,7 +71,7 @@ export function NewProjectDialog({ open, onClose, initialTemplate }: Props) {
                 <option key={c.id} value={c.id}>{c.label}</option>
               ))}
             </select>
-            {(category === 'game' || category === '3d') && !tpl && (
+            {category === 'game' && !tpl && (
               <p className="mt-1.5 text-xs text-amber-300/90">
                 O editor dedicado desta categoria chega em uma fase posterior. O projeto já pode ser criado, organizado e usar o editor de interfaces.
               </p>

@@ -29,6 +29,7 @@ export const FORMATS: Record<string, FormatInfo> = {
   mtl: { ext: 'mtl', mime: 'model/mtl', kind: 'model3d', category: 'materials', label: 'MTL' },
   fbx: { ext: 'fbx', mime: 'application/octet-stream', kind: 'model3d', category: 'models3d', label: 'FBX' },
   stl: { ext: 'stl', mime: 'model/stl', kind: 'model3d', category: 'models3d', label: 'STL' },
+  hdr: { ext: 'hdr', mime: 'image/vnd.radiance', kind: 'hdri', category: 'textures', label: 'HDR (Radiance)' },
   omnicomp: { ext: 'omnicomp', mime: 'application/json', kind: 'component', category: 'components', label: 'Componente OmniDesign' },
 };
 
@@ -115,6 +116,8 @@ export function validateContent(ext: string, bytes: Uint8Array): string | null {
       const count = new DataView(b.buffer, b.byteOffset, b.byteLength).getUint32(80, true);
       return ok(84 + count * 50 === b.length, 'STL');
     }
+    case 'hdr':
+      return ok(/^#\?(RADIANCE|RGBE)/.test(ascii(b, 0, 10)), 'HDR');
     case 'omnicomp': {
       if (!looksText(b)) return 'Componente deve ser JSON';
       try {

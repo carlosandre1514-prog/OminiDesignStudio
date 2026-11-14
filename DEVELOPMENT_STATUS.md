@@ -1,6 +1,6 @@
 # DEVELOPMENT_STATUS
 
-_Última atualização: 2026-11-14 (login e sincronização em nuvem)_
+_Última atualização: 2026-11-14 (Fase 4 — 3D Design Studio)_
 
 ## Fases concluídas
 
@@ -71,18 +71,34 @@ _Última atualização: 2026-11-14 (login e sincronização em nuvem)_
 - Indicadores na barra lateral (sincronizado, pendências, conflitos, offline, erro) e local de armazenamento "Local + nuvem" nos detalhes do projeto.
 - Script SQL do Supabase (`supabase/migrations/0001_omnidesign_sync.sql`) com RLS, gatilho de revisão, sem exclusão física, bucket privado com arquivos imutáveis. Guia em `docs/CLOUD_SETUP.md`.
 
+### ✅ Fase 4 — 3D Design Studio
+- **Viewport** em tempo real (Three.js + React Three Fiber + Drei, carregado sob demanda): órbita, pan, zoom, perspectiva/ortográfica, vistas (frente, direita, topo), grid, eixos e widget de orientação, seleção por clique (Shift soma), gizmo de mover/girar/escalar (W/E/R) em eixos globais ou locais com snap, modos Wireframe / Sólido / Material.
+- **Objetos**: cubo, esfera, cilindro, cone, plano, toro (parâmetros editáveis) e malhas próprias; duplicar, agrupar/desagrupar (mantendo a posição no mundo), hierarquia (mover para dentro de grupos), unir malhas, separar seleção, excluir, alinhar (origem/mín/centro/máx), apoiar no chão, espelhar, aplicar transformação. Objetos novos procuram espaço livre.
+- **Modelagem** (malha poligonal própria, operações puras e testadas): modo objeto/edição (Tab), seleção de vértices/arestas/faces (1/2/3, A, Shift), mover/girar/escalar a seleção com gizmo, extrudar (região, com paredes e orientação preservadas), inset, bevel de faces, loop cut em anéis de quads, subdivisão Catmull–Clark ou plana, mesclar vértices próximos, inverter normais, excluir.
+- **Modificadores não destrutivos**: subdivisão (até 3 níveis, suave ou plana) e espelhamento X/Y/Z com solda da costura; podem ser aplicados na malha.
+- **Materiais PBR**: cor base, metálico, rugosidade, opacidade, emissivo, mapas de cor, normal, rugosidade, metálico, AO, emissivo e alpha vindos da Asset Library; repetição, deslocamento e rotação de textura; dupla face. **UV** por projeção (caixa, planar XY/XZ/YZ, esférica, cilíndrica).
+- **Iluminação**: direcional, pontual, spot, área e hemisférica; intensidade, cor ou temperatura de cor (Kelvin), alcance, ângulo e suavidade; sombras configuráveis (liga/desliga, qualidade, suavidade); ambiente procedural (estúdio, ar livre, noite) ou **HDRI** (.hdr da biblioteca), fundo em cor, ambiente ou transparente.
+- **Importação** pela Asset Library: GLB, GLTF (com .bin/texturas externas resolvidas pelo nome na biblioteca e erro claro se faltarem), OBJ + MTL (materiais e texturas pelo nome), FBX (texturas embutidas ou da biblioteca), STL. Miniatura 3D gerada ao importar na biblioteca.
+- **Exportação**: GLB e GLTF (geometria, hierarquia, transformações, materiais, texturas e luzes), OBJ, STL, PNG da vista (1× ou 2×, fundo transparente opcional); exportar tudo ou só a seleção.
+- **Apresentação**: tela limpa com rotação automática, tela cheia e captura de imagem.
+- Desfazer/refazer, salvamento automático, versões, miniatura do projeto, sincronização em nuvem e pacotes de projeto (texturas, modelos e HDRI referenciados como `asset:<id>`).
+
 ### ✅ Publicação
 - GitHub Pages via GitHub Actions (`.github/workflows/pages.yml`): testes + build no subcaminho `/OminiDesignStudio/` + deploy a cada push. Supabase do projeto configurado no build.
 - App preparado para subcaminho: rotas (`basename`), service worker e manifest com escopo relativo, ícones, links de e-mail do Supabase apontando para `<base>/account`, `404.html` para links diretos.
 - Verificado com um servidor que simula o Pages (`e2e/pages-server.mjs`): suítes smoke, assets e avançada passando; tela de conta com Supabase pré-configurado; service worker no escopo correto.
 
 ## Fases em andamento
-Nenhuma. Próxima: **Fase 4 — 3D Design Studio**.
+Nenhuma. Próxima: **Fase 5 — Game Design Studio**.
 
 ## Funcionalidades pendentes (conhecidas)
-Itens que dependem de fases futuras (não são pendências das fases entregues):
-- Visualização e miniatura de modelos 3D da biblioteca — chega com o viewport 3D (Fase 4).
-- Materiais como tipo de asset — depende do editor PBR (Fase 4); prefabs — dependem do editor de jogos (Fase 5). Hoje são categorias de organização.
+Fase 4 (3D) — ainda não implementado:
+- Bevel de **arestas** (o bevel atual é de faces: inset + altura) e editor de UV (desdobramento manual); hoje o UV é por projeção.
+- Transformar vários objetos de uma vez pelo gizmo (hoje: um objeto por vez; alinhar/espelhar/agrupar funcionam em lote).
+- WebGPU (o viewport usa WebGL) e física (Rapier, prevista junto ao Game Design Studio).
+- Salvar materiais como assets da biblioteca (prefabs dependem da Fase 5).
+- Loop cut testado em testes unitários; no navegador depende de clicar exatamente na aresta (sem teste automatizado de clique).
+
 - Restante da Fase 6: sistema de plugins, otimizações e testes de integração adicionais.
 
 Limitações conscientes:
@@ -94,7 +110,7 @@ Limitações conscientes:
 - Tamanho de projeto exibido é aproximado (tamanho do JSON serializado).
 
 ## Testes realizados
-- `npm test` — 79 testes (Vitest, IndexedDB simulado por fake-indexeddb):
+- `npm test` — 100 testes (Vitest, IndexedDB simulado por fake-indexeddb):
   - histórico (commit/undo/redo/gestos/limite);
   - serviço de projetos (CRUD, favoritos, duplicação profunda, versões, restauração não destrutiva, poda de versões automáticas, export/import `.omni`, validação de arquivos corrompidos, exclusão em cascata);
   - operações do editor (mover, grupos, redimensionar grupos, exclusão em cascata, duplicação com remapeamento, ordem Z, alinhar/distribuir, smart snap, telas, normalização de dados corrompidos);
@@ -107,16 +123,19 @@ Limitações conscientes:
   - exportação avançada (rotação, `:active`, `:focus-within`, desabilitado, ícones SVG, `@media` na ordem correta, instâncias aninhadas, transições, `@font-face`, variantes Tailwind);
   - sincronização (10 cenários com dois dispositivos: envio/recebimento, edições sequenciais, campos locais sem tráfego, conflito e as três resoluções, exclusões e exclusão × edição, assets com verificação de integridade, isolamento de contas, rejeição de dados inválidos);
   - adaptador Supabase (filtros e paginação, escrita condicional, duplicidade, registros grandes no Storage, integridade, arquivos existentes/ausentes, erros) e validação de chaves;
+  - malha poligonal 3D (primitivas fechadas e orientadas, volumes, extrusão de face e de região, inset, bevel, Catmull–Clark, loop cut em caixa e cilindro, mesclar, excluir, inverter, espelhar com solda);
+  - cena 3D (grupos preservando transformações do mundo, ciclos, duplicar, alinhar, apoiar no chão, aplicar transformação, unir e separar, materiais, referências de assets para pacotes, normalização de dados corrompidos);
+  - exportação 3D (hierarquia e seleção, OBJ/STL reimportados com a mesma geometria, glTF com malhas, materiais e luzes);
   - pacotes de projeto (busca/reescrita de referências, ida e volta em biblioteca vazia com remapeamento inclusive nas versões, reaproveitamento, dependências ausentes, ZIP inválido).
 - `npm run test:e2e` — fluxo completo no navegador (Chromium): criar projeto por modelo, inserir, arrastar, desfazer/refazer, editar texto, protótipo com navegação e modal, troca de dispositivo, exportação, persistência após recarregar, dashboard, indicador offline, layout mobile sem rolagem horizontal, ausência de erros no console. ✅
 - `e2e/assets.mjs` — importação (válidos, inválido rejeitado, duplicado reaproveitado), renomear/tag/filtro, pastas, imagem da biblioteca no canvas, exportação HTML com o arquivo do asset, aba do projeto, exportação e reimportação do pacote do projeto. ✅
 - `e2e/advanced.mjs` — rotação (campo e alça), estado pressionado, desabilitado, ícone da biblioteca, transição animada, ajuste por breakpoint preservando a base e aplicado na pré-visualização de celular, criação de componente e propagação do mestre para instâncias, componente salvo na biblioteca, fonte da biblioteca, CSS exportado. ✅
 - `npm run test:sql` — script do Supabase aplicado duas vezes num PostgreSQL 16 real: RLS por usuário (registros e arquivos), anônimo sem acesso, revisão +1, revisão inicial 1, hash válido, sem exclusão física, referência de payload restrita ao próprio usuário, arquivos imutáveis. ✅
+- `e2e/studio3d.mjs` — no navegador com WebGL: render da cena verificado por pixels (cor do material PBR aplicada, sombra presente/ausente), mover e desfazer, adicionar esfera e luz, modo edição com inset/extrusão/subdivisão conferidos pela contagem da malha, desfazer, modificador sem alterar a base, exportação GLB/STL/OBJ/PNG verificada nos arquivos, reimportação do GLB, apresentação, persistência após recarregar, miniatura 3D na biblioteca. ✅
 - **Validado no projeto Supabase real** (14/11/2026): script aplicado, checagem de segurança do Supabase sem problemas de banco, e `e2e/cloud.mjs` em modo real (`SUPABASE_URL`/`SUPABASE_ANON_KEY`) passou de ponta a ponta — cadastro, login, dois dispositivos, edição nos dois sentidos, asset com arquivo no Storage, offline, conflito, "manter ambos", sair — além do isolamento entre contas (outra conta não lê, não grava em nome de outro, não altera e não baixa arquivos; nem o dono apaga fisicamente). ✅
 - `e2e/cloud.mjs` (modo local) — supabase-js real contra servidor local que imita o Supabase: configuração pela interface (chave secreta recusada), cadastro, consentimento, sincronização, senha errada, segundo dispositivo, edição nos dois sentidos, asset com arquivo, offline com pendências, conflito, "manter ambos", sair preservando dados. ✅
 - Verificação manual: os projetos React e React+Tailwind exportados passam em `tsc` e `vite build` e executam o protótipo (navegação + modal) corretamente.
 
 ## Próximas tarefas
 1. Antes de abrir para outras pessoas: SMTP próprio no Supabase (o envio padrão só entrega para a equipe do projeto e tem limite por hora) e religar "Confirm email".
-2. Fase 4 — 3D Design Studio: viewport (Three.js/R3F, carregado sob demanda), primitivas, transformações, modo de edição, materiais PBR com texturas da biblioteca, iluminação, importação GLB/GLTF/OBJ/FBX/STL a partir da biblioteca e exportação GLB/GLTF/OBJ/STL/PNG.
-3. Fase 5 — Game Design Studio (GDD, editor 2D, tilemaps, spritesheets, lógica por nodes).
+2. Fase 5 — Game Design Studio (GDD, editor 2D, tilemaps, spritesheets, lógica por nodes).

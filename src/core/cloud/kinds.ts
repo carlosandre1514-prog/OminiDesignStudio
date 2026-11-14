@@ -161,7 +161,7 @@ export function createAdapters(db: OmniDatabase): Record<SyncKind, KindAdapter> 
     },
     async write(id, p, remote) {
       if (!isObj(p) || !str(p.name, 200) || typeof p.hash !== 'string' || !/^[0-9a-f]{64}$/.test(p.hash)) throw new InvalidPayload('Asset inválido vindo da nuvem');
-      if (!['image', 'vector', 'audio', 'font', 'model3d', 'component'].includes(p.kind as string) || !ASSET_CATEGORIES.some((c) => c.id === p.category))
+      if (!['image', 'vector', 'audio', 'font', 'model3d', 'component', 'hdri'].includes(p.kind as string) || !ASSET_CATEGORIES.some((c) => c.id === p.category))
         throw new InvalidPayload('Tipo de asset inválido vindo da nuvem');
       const hash = p.hash as string;
       if (!(await db.assetData.get(hash))) {

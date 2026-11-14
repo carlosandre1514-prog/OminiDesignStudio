@@ -58,6 +58,13 @@ export async function analyzeMedia(kind: AssetKind, blob: Blob, maxSize = 256): 
       );
       return { meta: duration ? { duration } : {} };
     }
+    if (kind === 'model3d') {
+      // Render a preview with the 3D engine (loaded on demand).
+      const { renderModelThumbnail } = await import('@/modules/studio-3d/loaders');
+      const ext = (blob as Blob & { ext?: string }).ext;
+      const thumbnail = ext ? await withTimeout(renderModelThumbnail(await blob.arrayBuffer(), ext), 15000, undefined) : undefined;
+      return { meta: {}, thumbnail };
+    }
     return { meta: {} };
   } finally {
     URL.revokeObjectURL(url);

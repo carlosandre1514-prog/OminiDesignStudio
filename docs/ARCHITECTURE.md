@@ -48,3 +48,10 @@
 - **Segurança no servidor**: RLS por `owner = auth.uid()`, gatilho que exige revisão +1, sem DELETE, Storage só com criação em caminhos endereçados por hash do próprio usuário.
 - **Integração com editores** por ganchos (`hooks.ts`): gravar antes de sincronizar; recarregar o projeto aberto quando ele muda pela nuvem.
 - O SDK do Supabase é carregado sob demanda, só quando a nuvem está configurada.
+
+## 3D Design Studio (Fase 4)
+- **Malha poligonal própria** (`studio-3d/mesh/polyMesh.ts`): vértices + faces n-gon, operações puras (extrusão de região, inset, bevel, Catmull–Clark, loop cut, espelhar com solda). Testável sem navegador; a geometria do Three.js é gerada a partir dela (`geometry.ts`), com normais planas/suaves, projeções de UV e mapa triângulo→face para seleção no modo edição.
+- **Primitivas paramétricas** viram malha editável ao entrar no modo edição; **modificadores** (espelho, subdivisão) são aplicados só na geração da geometria.
+- **Uma fonte para viewport e exportação**: geometria (`objectGeometry`, memorizada por identidade) e materiais (`materials.ts`) são compartilhados pelo viewport (R3F) e pelo construtor de cena dos exportadores.
+- **Assets por referência** (`asset:<id>`): modelos, texturas e HDRI vêm da Asset Library e entram nos pacotes de projeto. Dependências externas de GLTF/OBJ/FBX são resolvidas pelo nome do arquivo na biblioteca; ausências viram erro/aviso explícito.
+- O módulo inteiro (Three.js incluso) é um chunk separado, carregado só ao abrir o 3D Studio.

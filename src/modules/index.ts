@@ -29,8 +29,9 @@ registerModule({
   description: 'Viewport 3D, modelagem, materiais PBR, iluminação e importação/exportação 3D.',
   icon: '◈',
   phase: 4,
-  status: 'planned',
+  status: 'available',
   defaultFor: ['3d'],
+  editor: lazy(() => import('./studio-3d/Studio3D')),
 });
 
 registerModule({

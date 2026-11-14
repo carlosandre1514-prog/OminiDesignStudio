@@ -55,7 +55,8 @@ export async function importAssetBytes(fileName: string, data: ArrayBuffer, opts
     return { status: 'duplicate', fileName, asset: (await db.assets.get(existing.id))! };
   }
 
-  const analyzed = await analyzeMedia(fmt.kind, new Blob([data], { type: fmt.mime }));
+  const analysisBlob = Object.assign(new Blob([data], { type: fmt.mime }), { ext: fmt.ext });
+  const analyzed = await analyzeMedia(fmt.kind, analysisBlob);
   const meta = analyzed.meta;
   const thumbnail = analyzed.thumbnail ?? (opts.thumbnail?.startsWith('data:image/') ? opts.thumbnail : undefined);
   const now = Date.now();

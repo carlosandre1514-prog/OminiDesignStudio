@@ -2,7 +2,7 @@
 
 Plataforma universal de criação digital (Web App/PWA, futuramente Android/iOS via Capacitor) que reúne em um único ecossistema ferramentas de Web/UI/App Design, Game Design, 3D e gerenciamento de assets.
 
-> Status atual: **Fases 1 (Fundação), 2 (Web & App Design) e 3 (Asset Library) entregues, além de login e sincronização em nuvem (Supabase).** Veja [`DEVELOPMENT_STATUS.md`](DEVELOPMENT_STATUS.md) para o que está pronto, pendente e testado.
+> Status atual: **Fases 1 (Fundação), 2 (Web & App Design), 3 (Asset Library) e 4 (3D Design Studio) entregues, além de login e sincronização em nuvem (Supabase).** Veja [`DEVELOPMENT_STATUS.md`](DEVELOPMENT_STATUS.md) para o que está pronto, pendente e testado.
 
 **App publicado:** https://carlosandre1514-prog.github.io/OminiDesignStudio/ (GitHub Pages, atualizado a cada push).
 
@@ -31,9 +31,9 @@ node e2e/pages-server.mjs   # http://localhost:4175/OminiDesignStudio/
 
 ## Stack
 
-React 19 · Vite 6 · TypeScript (strict) · Tailwind CSS 4 · Zustand 5 · React Router 7 · Dexie 4 (IndexedDB) · Supabase (auth + sync) · JSZip · Vitest.
+React 19 · Vite 6 · TypeScript (strict) · Tailwind CSS 4 · Zustand 5 · React Router 7 · Dexie 4 (IndexedDB) · Three.js + React Three Fiber + Drei · Supabase (auth + sync) · JSZip · Vitest.
 
-As tecnologias de 3D (Three.js/R3F/Rapier) e Capacitor entram nas fases correspondentes e serão carregadas sob demanda.
+Rapier (física) e Capacitor entram nas fases correspondentes.
 
 ## Estrutura
 
@@ -51,6 +51,7 @@ src/
     index.ts       registro dos módulos (carregamento sob demanda)
     web-design/    Web & App Design Studio (modelo, operações, export, UI)
     asset-library/ UI da biblioteca, seletor de assets
+    studio-3d/     3D Design Studio (malha poligonal, cena, viewport, materiais, import/export)
   pages/           Dashboard, Projetos, Modelos, Histórico, Armazenamento, Configurações, Workspace
   templates/       modelos de projeto
   ui/              shell, diálogos, toasts, error boundary
