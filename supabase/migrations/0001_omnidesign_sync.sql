@@ -24,7 +24,8 @@ alter table public.omni_records drop constraint if exists omni_records_payload_r
 alter table public.omni_records add constraint omni_records_payload_ref_format
   check (payload_ref is null or payload_ref ~ ('^' || owner::text || '/payloads/[0-9a-f]{64}\.json$'));
 
-create index if not exists omni_records_owner_kind_idx on public.omni_records (owner, kind);
+-- A chave primária (owner, kind, id) já atende as consultas por (owner, kind): sem índice extra.
+drop index if exists public.omni_records_owner_kind_idx;
 
 -- Concorrência otimista: toda atualização deve incrementar a revisão em exatamente 1.
 -- Assim uma escrita baseada em uma revisão antiga nunca sobrescreve outra silenciosamente.
@@ -72,8 +73,8 @@ create policy "omni_records_update_own" on public.omni_records
   for update to authenticated using (owner = (select auth.uid())) with check (owner = (select auth.uid()));
 -- Sem política de DELETE: exclusões viram "lápides" (deleted = true) para propagar entre dispositivos.
 
-revoke all on public.omni_records from anon;
-revoke delete on public.omni_records from authenticated;
+-- Privilégios mínimos: o Supabase concede ALL por padrão; o app só precisa de SELECT/INSERT/UPDATE.
+revoke all on public.omni_records from anon, authenticated;
 grant select, insert, update on public.omni_records to authenticated;
 
 -- 2) Arquivos (Storage) ----------------------------------------------------------------------

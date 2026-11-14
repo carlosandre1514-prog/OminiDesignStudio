@@ -94,4 +94,8 @@ do $$ begin
   exception when insufficient_privilege then null; end;
 end $$;
 reset role;
+do $$ begin
+  assert not has_table_privilege('authenticated', 'public.omni_records', 'TRUNCATE'), 'no truncate';
+  assert not has_table_privilege('authenticated', 'public.omni_records', 'DELETE'), 'no delete';
+end $$;
 select 'RLS OK' as result;
