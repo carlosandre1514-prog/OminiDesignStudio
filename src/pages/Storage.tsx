@@ -1,7 +1,10 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useState } from 'react';
 import { db } from '@/core/db/database';
-import { estimateProjectSize, exportProject, listProjects } from '@/core/projects/projectService';
+import { exportAssetsZip, libraryStats } from '@/core/assets/assetService';
+import { estimateProjectSize, listProjects } from '@/core/projects/projectService';
+import { exportProjectZip } from '@/core/projects/projectPackage';
+import { slugify } from '@/core/utils/sanitize';
 import { downloadBlob, formatBytes } from '@/core/utils/download';
 import { toast } from '@/ui/toast';
 
@@ -32,10 +35,13 @@ export default function Storage() {
       const { default: JSZip } = await import('jszip');
       const zip = new JSZip();
       const projects = await listProjects();
-      for (const p of projects) zip.file(`${p.id}.omni`, JSON.stringify(await exportProject(p.id)));
+      // Each project is a self-contained package (importable on its own); the full library goes alongside.
+      for (const p of projects) zip.file(`projetos/${slugify(p.name, 'projeto')}-${p.id.slice(-6)}.zip`, await exportProjectZip(p.id));
+      const assetIds = (await db.assets.toCollection().primaryKeys()) as string[];
+      if (assetIds.length) zip.file('biblioteca-assets.zip', await exportAssetsZip(assetIds));
       const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
       downloadBlob(blob, `omnidesign-backup-${new Date().toISOString().slice(0, 10)}.zip`);
-      toast.success(`Backup de ${projects.length} projeto(s) gerado`);
+      toast.success(`Backup gerado: ${projects.length} projeto(s) e ${assetIds.length} asset(s)`);
     } catch (e) {
       toast.error(`Falha no backup: ${e instanceof Error ? e.message : e}`);
     }
@@ -49,6 +55,7 @@ export default function Storage() {
     void refresh();
   };
 
+  const lib = useLiveQuery(() => libraryStats(), []);
   const total = rows?.reduce((s, r) => s + r.size, 0) ?? 0;
   const pctUsed = estimate && estimate.quota ? (estimate.usage / estimate.quota) * 100 : 0;
 
@@ -85,6 +92,17 @@ export default function Storage() {
           )}
         </div>
         <p className="text-xs text-ink-400">Com persistência ativa, o navegador não apaga os dados do OmniDesign automaticamente quando há pouco espaço.</p>
+      </section>
+
+      <section className="panel space-y-1 p-5">
+        <h2 className="font-medium">Biblioteca de assets</h2>
+        {lib && (
+          <p className="text-sm text-ink-300">
+            {lib.count} asset(s) · {formatBytes(lib.bytes)} armazenados
+            {lib.logicalBytes > lib.bytes && <> (economia de {formatBytes(lib.logicalBytes - lib.bytes)} por deduplicação)</>}
+          </p>
+        )}
+        <p className="text-xs text-ink-400">Arquivos idênticos são armazenados uma única vez, mesmo quando duplicados ou usados em vários projetos.</p>
       </section>
 
       <section className="panel p-5">

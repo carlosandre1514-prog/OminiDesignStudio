@@ -1,5 +1,8 @@
 import { useShallow } from 'zustand/react/shallow';
-import { readFileAsDataUrl } from '@/core/utils/download';
+import { useState } from 'react';
+import { assetUri, parseAssetUri } from '@/core/assets/types';
+import { AssetPicker } from '@/modules/asset-library/AssetPicker';
+import { importWithFeedback } from '@/modules/asset-library/AssetLibrary';
 import { safeColor } from '@/core/utils/sanitize';
 import { useSettings } from '@/core/settings/settings';
 import { toast } from '@/ui/toast';
@@ -111,14 +114,19 @@ function ElementProps({ el, multi = false }: { el: WDElement; multi?: boolean })
   const setInteraction = (i: Interaction | null) => patchSel(() => ({ interaction: i }));
   const toggleTargets = screen.elements.filter((e) => e.type !== 'group');
 
+  const projectId = useWebDesign((x) => x.projectId);
+  const [picking, setPicking] = useState(false);
+  /** Uploads go to the Asset Library (validated, deduplicated) and the element references them. */
   const uploadImage = async (file: File | undefined) => {
     if (!file) return;
-    if (!/^image\/(png|jpe?g|webp|gif|svg\+xml)$/.test(file.type)) return toast.error('Formato de imagem não suportado');
     if (file.size > maxImport * 1024 * 1024) return toast.error(`Imagem maior que ${maxImport} MB`);
-    // SVG files are embedded as images (never inlined as markup) so scripts inside them cannot run.
-    const src = await readFileAsDataUrl(file);
-    patchSel(() => ({ src }));
+    const [r] = await importWithFeedback([file], { projectId });
+    if (!r || r.status === 'error') return;
+    if (r.asset.kind !== 'image' && r.asset.kind !== 'vector') return toast.error('O arquivo não é uma imagem');
+    // SVGs are always rendered through <img>, never inlined, so scripts inside them cannot run.
+    patchSel(() => ({ src: assetUri(r.asset.id) }));
   };
+  const assetRef = parseAssetUri(el.src);
 
   return (
     <>
@@ -177,7 +185,14 @@ function ElementProps({ el, multi = false }: { el: WDElement; multi?: boolean })
           )}
           {el.type === 'image' && (
             <>
-              <TextField label="URL da imagem" value={el.src?.startsWith('data:') ? '' : el.src ?? ''} placeholder={el.src?.startsWith('data:') ? '(imagem incorporada)' : 'https://…'} onCommit={(src) => patchSel(() => ({ src }))} />
+              <TextField
+                label="URL da imagem"
+                value={el.src?.startsWith('data:') || assetRef ? '' : el.src ?? ''}
+                placeholder={assetRef ? '(asset da biblioteca)' : el.src?.startsWith('data:') ? '(imagem incorporada)' : 'https://…'}
+                onCommit={(src) => patchSel(() => ({ src }))}
+              />
+              <button className="btn-outline w-full text-xs" onClick={() => setPicking(true)}>Escolher da biblioteca…</button>
+              {picking && <AssetPicker kinds={['image', 'vector']} projectId={projectId} onClose={() => setPicking(false)} onPick={(a) => patchSel(() => ({ src: assetUri(a.id), name: el.name === 'Imagem' ? a.name : el.name }))} />}
               <div className="flex gap-1.5">
                 <label className="btn-outline flex-1 cursor-pointer text-xs">
                   Enviar imagem…

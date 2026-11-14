@@ -18,8 +18,9 @@ registerModule({
   description: 'Biblioteca universal de recursos com pastas, tags e importação.',
   icon: '◫',
   phase: 3,
-  status: 'planned',
+  status: 'available',
   defaultFor: [],
+  editor: lazy(() => import('./asset-library/AssetLibraryModule')),
 });
 
 registerModule({

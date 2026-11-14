@@ -29,3 +29,9 @@
 - Service worker (`public/sw.js`) faz cache do app shell e dos assets compilados; navegação offline cai no `index.html`.
 - Indicador online/offline e de sincronização (atualmente "somente local": sincronização em nuvem é da Fase 6).
 - `navigator.storage.persist()` é solicitado para evitar limpeza automática dos dados.
+
+## Asset Library (Fase 3)
+- **Endereçamento por conteúdo.** `assets` guarda metadados; `assetData` guarda os bytes indexados pelo SHA-256. Vários assets (duplicatas, mesmo arquivo importado duas vezes, mesmo arquivo em projetos diferentes) apontam para o mesmo conteúdo. A exclusão faz coleta de lixo do conteúdo sem referências.
+- **ArrayBuffer em vez de Blob** no IndexedDB, por compatibilidade (Safari antigo e ambientes de teste).
+- **Referências `asset:<id>`** dentro dos documentos dos módulos. A UI resolve para object URLs (cache em `assetUrls.ts`); exportadores substituem por caminhos de arquivo empacotados. Pacotes de projeto remapeiam ids ao importar (`projectPackage.ts`) e listam dependências ausentes.
+- **Validação dupla**: extensão suportada + assinatura/estrutura do conteúdo (`formats.ts`). Nada importado é executado; SVG só é exibido via `<img>`.

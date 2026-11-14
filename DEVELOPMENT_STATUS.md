@@ -1,6 +1,6 @@
 # DEVELOPMENT_STATUS
 
-_Última atualização: 2026-11-14_
+_Última atualização: 2026-11-14 (Fase 3)_
 
 ## Fases concluídas
 
@@ -27,12 +27,28 @@ _Última atualização: 2026-11-14_
 - Prototipagem: navegação entre telas, mostrar/ocultar elementos (modais), links externos, elementos ocultos ao iniciar, voltar, reiniciar estados; modo Apresentação e tela cheia.
 - Exportação: HTML+CSS(+JS de interações), React+TypeScript (projeto Vite), React+TypeScript+Tailwind; visualização do código, copiar, baixar arquivo e ZIP.
 
+### ✅ Fase 3 — Asset Library
+- Tabelas `assets`, `assetData` e `folders` no mesmo IndexedDB (migração automática v1 → v2).
+- Armazenamento por conteúdo (SHA-256): arquivos idênticos são guardados uma única vez; importar um arquivo já existente reaproveita o asset; "Duplicar" copia só os metadados; os bytes são removidos quando nenhum asset os referencia.
+- Importação validada (extensão **e** conteúdo/magic bytes, limite de tamanho configurável): PNG, JPG/JPEG, WEBP, GIF, SVG, MP3, WAV, OGG, TTF, OTF, WOFF, WOFF2, GLB, GLTF, OBJ, MTL, FBX, STL. Arquivos 3D são armazenados e catalogados; a visualização 3D chega na Fase 4.
+- Miniaturas (imagens/SVG), dimensões e duração de áudio extraídas na importação; pré-visualização de imagens, player de áudio e amostra de fontes (FontFace).
+- 14 categorias do blueprint, pastas aninhadas (criar, renomear, excluir sem perder conteúdo, arrastar assets para pastas, proteção contra ciclos), tags, favoritos, busca, filtros por tipo/categoria/tag/pasta, ordenação.
+- Renomear, duplicar, excluir (com aviso de projetos vinculados), baixar, seleção múltipla com mover/vincular/exportar/excluir em lote.
+- Vínculo de assets a projetos (manual ou automático ao usar no editor); excluir um projeto remove apenas o vínculo.
+- Biblioteca global (`/assets`) e aba "Asset Library" dentro de cada projeto (escopo "deste projeto" / "toda a biblioteca").
+- Exportação ZIP de assets (com `manifest.json`) e importação de ZIP (pacote do OmniDesign ou ZIP simples de arquivos).
+- Pacote de projeto `.zip` (project.omni + assets + manifest): exportação e importação com remapeamento das referências (inclusive nas versões), deduplicação contra a biblioteca local e **detecção de dependências ausentes**. Importar `.omni` também avisa sobre assets ausentes. Detecção de ZIP pelo conteúdo.
+- Backup completo agora gera um pacote ZIP por projeto + a biblioteca inteira (todos reimportáveis).
+- Integração com o Web Design: "Escolher da biblioteca" e "Enviar imagem" (que importa para a biblioteca) no elemento Imagem; referências `asset:<id>` resolvidas no canvas e no protótipo; aviso visual de asset ausente; exportação HTML/React inclui os arquivos (`assets/` ou `public/assets/`).
+- Dashboard e Armazenamento exibem estatísticas da biblioteca (incluindo economia por deduplicação).
+
 ## Fases em andamento
-Nenhuma. Próxima: **Fase 3 — Asset Library**.
+Nenhuma. Próxima: **Fase 4 — 3D Design Studio**.
 
 ## Funcionalidades pendentes (conhecidas)
 - Fase 2: ajustes manuais por breakpoint (overrides de posição/tamanho por dispositivo); rotação de elementos; biblioteca de componentes reutilizáveis (componentes mestre/instâncias); transições animadas entre telas no protótipo; biblioteca de ícones (o elemento ícone usa um glifo de texto); variantes de estado além de hover (pressed/disabled).
-- Fase 1: importação de projetos em ZIP (planejada junto à Fase 3); autenticação e sincronização em nuvem (Fase 6).
+- Fase 1: autenticação e sincronização em nuvem (Fase 6).
+- Fase 3: fontes da biblioteca ainda não aparecem como opção de fonte no Web Design; visualização de modelos 3D (Fase 4); geração de miniatura para modelos 3D (Fase 4); materiais/prefabs/componentes como tipos próprios de asset (hoje são categorias de organização).
 - Fases 3 a 7 conforme o roadmap (Asset Library, 3D Studio, Game Design Studio, sistemas avançados, app nativo via Capacitor).
 
 ## Erros conhecidos
@@ -41,16 +57,19 @@ Nenhuma. Próxima: **Fase 3 — Asset Library**.
 - Tamanho de projeto exibido é aproximado (tamanho do JSON serializado).
 
 ## Testes realizados
-- `npm test` — 34 testes (Vitest, IndexedDB simulado por fake-indexeddb):
+- `npm test` — 48 testes (Vitest, IndexedDB simulado por fake-indexeddb):
   - histórico (commit/undo/redo/gestos/limite);
   - serviço de projetos (CRUD, favoritos, duplicação profunda, versões, restauração não destrutiva, poda de versões automáticas, export/import `.omni`, validação de arquivos corrompidos, exclusão em cascata);
   - operações do editor (mover, grupos, redimensionar grupos, exclusão em cascata, duplicação com remapeamento, ordem Z, alinhar/distribuir, smart snap, telas, normalização de dados corrompidos);
   - layout responsivo e exportadores (HTML escapado e sem URLs inseguras, React, Tailwind, ZIP);
-  - store do editor (persistência, undo/redo, gesto único, copiar/colar, recuperação após reinício).
+  - store do editor (persistência, undo/redo, gesto único, copiar/colar, recuperação após reinício);
+  - Asset Library (validação por conteúdo de todos os formatos, limites, deduplicação, duplicação com bytes compartilhados e coleta de lixo, tags/filtros/busca, pastas sem perda de conteúdo, vínculo e desvinculação ao excluir projeto, exportação/importação ZIP);
+  - pacotes de projeto (busca/reescrita de referências, ida e volta em biblioteca vazia com remapeamento inclusive nas versões, reaproveitamento, dependências ausentes, ZIP inválido).
 - `npm run test:e2e` — fluxo completo no navegador (Chromium): criar projeto por modelo, inserir, arrastar, desfazer/refazer, editar texto, protótipo com navegação e modal, troca de dispositivo, exportação, persistência após recarregar, dashboard, indicador offline, layout mobile sem rolagem horizontal, ausência de erros no console. ✅
+- `e2e/assets.mjs` — importação (válidos, inválido rejeitado, duplicado reaproveitado), renomear/tag/filtro, pastas, imagem da biblioteca no canvas, exportação HTML com o arquivo do asset, aba do projeto, exportação e reimportação do pacote do projeto. ✅
 - Verificação manual: os projetos React e React+Tailwind exportados passam em `tsc` e `vite build` e executam o protótipo (navegação + modal) corretamente.
 
 ## Próximas tarefas
-1. Fase 3 — Asset Library: tabela `assets` (Blob + metadados) no mesmo banco, pastas, tags, busca/filtros, miniaturas, favoritos, importação validada de mídia (PNG/JPG/WEBP/SVG/MP3/WAV/OGG/TTF/WOFF2), vínculo de assets a projetos, exportação ZIP e importação de projetos ZIP.
-2. Integrar a Asset Library ao Web Design (inserir imagens/ícones/fontes a partir da biblioteca).
+1. Fase 4 — 3D Design Studio: viewport (Three.js/R3F, carregado sob demanda), primitivas, transformações, modo de edição, materiais PBR com texturas da biblioteca, iluminação, importação GLB/GLTF/OBJ/FBX/STL a partir da biblioteca e exportação GLB/GLTF/OBJ/STL/PNG.
+2. Fontes da biblioteca no Web Design.
 3. Pendências da Fase 2 listadas acima.

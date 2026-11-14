@@ -5,7 +5,7 @@ import { listProjects } from '@/core/projects/projectService';
 import { PROJECT_CATEGORIES } from '@/core/projects/types';
 import { NewProjectDialog } from '@/ui/NewProjectDialog';
 import { ProjectCard } from '@/ui/ProjectCard';
-import { importProjectFromFile, pickFile } from '@/ui/projectActions';
+import { importProjectFromFile, pickFile, PROJECT_ACCEPT } from '@/ui/projectActions';
 
 type Sort = 'updated' | 'created' | 'name';
 
@@ -34,7 +34,7 @@ export default function Projects() {
           <button
             className="btn-outline"
             onClick={async () => {
-              const f = await pickFile('.omni,.json,application/json');
+              const f = await pickFile(PROJECT_ACCEPT);
               const id = f && (await importProjectFromFile(f));
               if (id) navigate(`/project/${id}`);
             }}

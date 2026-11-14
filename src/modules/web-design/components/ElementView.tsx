@@ -1,4 +1,5 @@
 import { useState, type CSSProperties, type MouseEvent } from 'react';
+import { useResolvedSrc } from '@/core/assets/assetUrls';
 import { safeUrl } from '@/core/utils/sanitize';
 import { cssToReact, hoverCss, visualCss, type CssMap } from '../layout';
 import type { WDElement } from '../model';
@@ -17,6 +18,7 @@ const linkStyle: CSSProperties = { color: 'inherit', textDecoration: 'none', pad
 /** Renders an element's real content. Shared by the editor canvas and the prototype preview. */
 export function ElementView({ el, box, interactive, onActivate }: Props) {
   const [hover, setHover] = useState(false);
+  const resolved = useResolvedSrc(el.type === 'image' ? el.src : undefined);
   const hv = interactive && hover ? hoverCss(el) : null;
   const style = cssToReact({ ...box, ...visualCss(el), ...(hv ?? {}) }) as CSSProperties;
   if (!interactive) style.pointerEvents = 'none';
@@ -43,8 +45,10 @@ export function ElementView({ el, box, interactive, onActivate }: Props) {
       content = el.text;
       break;
     case 'image': {
-      const src = safeUrl(el.src);
-      content = src ? (
+      const src = safeUrl(resolved.url);
+      content = resolved.missing ? (
+        <div style={{ display: 'flex', width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center', color: '#b91c1c', fontSize: 12, textAlign: 'center' }}>Asset ausente na biblioteca</div>
+      ) : src ? (
         <img src={src} alt={el.name} draggable={false} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
       ) : (
         <div style={{ display: 'flex', width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center', color: '#6b7280', fontSize: 12 }}>Imagem</div>

@@ -100,7 +100,14 @@ export async function saveModuleData(projectId: string, moduleId: string, data: 
 }
 
 export async function deleteProject(id: string): Promise<void> {
-  await db.transaction('rw', [db.projects, db.documents, db.versions, db.history], async () => {
+  await db.transaction('rw', [db.projects, db.documents, db.versions, db.history, db.assets], async () => {
+    // Library assets are kept; only their link to this project is removed.
+    await db.assets
+      .where('projectIds')
+      .equals(id)
+      .modify((a) => {
+        a.projectIds = a.projectIds.filter((p) => p !== id);
+      });
     await db.projects.delete(id);
     await db.documents.delete(id);
     await db.versions.where('projectId').equals(id).delete();

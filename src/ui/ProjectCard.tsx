@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { deleteProject, duplicateProject, updateProjectMeta } from '@/core/projects/projectService';
 import { PROJECT_CATEGORIES, type ProjectMeta } from '@/core/projects/types';
 import { ProjectDetailsDialog } from './ProjectDetailsDialog';
-import { exportProjectFile } from './projectActions';
+import { exportProjectFile, exportProjectPackage } from './projectActions';
 import { toast } from './toast';
 
 export const fmtDate = (t: number) => new Date(t).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
@@ -59,6 +59,7 @@ export function ProjectCard({ project }: { project: ProjectMeta }) {
                   <button className="block w-full px-3 py-1.5 text-left hover:bg-ink-800" onClick={() => { setMenu(false); setDetails(true); }}>Detalhes e versões</button>
                   <button className="block w-full px-3 py-1.5 text-left hover:bg-ink-800" onClick={() => run(() => duplicateProject(project.id), 'Projeto duplicado')}>Duplicar</button>
                   <button className="block w-full px-3 py-1.5 text-left hover:bg-ink-800" onClick={() => run(() => exportProjectFile(project.id, project.name))}>Exportar (.omni)</button>
+                  <button className="block w-full px-3 py-1.5 text-left hover:bg-ink-800" onClick={() => run(() => exportProjectPackage(project.id, project.name))}>Exportar pacote (.zip + assets)</button>
                   <button
                     className="block w-full px-3 py-1.5 text-left text-red-300 hover:bg-ink-800"
                     onClick={() => {

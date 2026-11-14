@@ -7,6 +7,7 @@ import { Toaster } from '@/ui/Toaster';
 import Dashboard from '@/pages/Dashboard';
 
 const Projects = lazy(() => import('@/pages/Projects'));
+const Assets = lazy(() => import('@/pages/Assets'));
 const Templates = lazy(() => import('@/pages/Templates'));
 const History = lazy(() => import('@/pages/History'));
 const Storage = lazy(() => import('@/pages/Storage'));
@@ -29,6 +30,7 @@ export default function App() {
             <Route element={<AppShell />}>
               <Route index element={<Dashboard />} />
               <Route path="projects" element={<Projects />} />
+              <Route path="assets" element={<Assets />} />
               <Route path="templates" element={<Templates />} />
               <Route path="history" element={<History />} />
               <Route path="storage" element={<Storage />} />

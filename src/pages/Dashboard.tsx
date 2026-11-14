@@ -2,23 +2,26 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { listProjects } from '@/core/projects/projectService';
+import { libraryStats } from '@/core/assets/assetService';
+import { formatBytes } from '@/core/utils/download';
 import { listModules } from '@/core/modules/registry';
 import { NewProjectDialog } from '@/ui/NewProjectDialog';
 import { ProjectCard } from '@/ui/ProjectCard';
-import { importProjectFromFile, pickFile } from '@/ui/projectActions';
+import { importProjectFromFile, pickFile, PROJECT_ACCEPT } from '@/ui/projectActions';
 import { TEMPLATES } from '@/templates/templates';
 import { StatusIndicators } from '@/ui/AppShell';
 
 export default function Dashboard() {
   const navigate = useNavigate();
   const projects = useLiveQuery(() => listProjects(), []);
+  const lib = useLiveQuery(() => libraryStats(), []);
   const [newOpen, setNewOpen] = useState(false);
   const [tpl, setTpl] = useState<string | undefined>();
   const recent = [...(projects ?? [])].sort((a, b) => (b.lastOpenedAt ?? b.updatedAt) - (a.lastOpenedAt ?? a.updatedAt)).slice(0, 8);
   const favorites = (projects ?? []).filter((p) => p.favorite);
 
   const openImport = async () => {
-    const f = await pickFile('.omni,.json,application/json');
+    const f = await pickFile(PROJECT_ACCEPT);
     if (!f) return;
     const id = await importProjectFromFile(f);
     if (id) navigate(`/project/${id}`);
@@ -37,7 +40,7 @@ export default function Dashboard() {
         </div>
       </section>
 
-      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <div className="panel p-4">
           <div className="section-title">Projetos</div>
           <div className="mt-2 text-2xl font-semibold">{projects?.length ?? '…'}</div>
@@ -46,6 +49,10 @@ export default function Dashboard() {
           <div className="section-title">Favoritos</div>
           <div className="mt-2 text-2xl font-semibold">{projects ? favorites.length : '…'}</div>
         </div>
+        <Link to="/assets" className="panel p-4 hover:border-ink-700">
+          <div className="section-title">Biblioteca</div>
+          <div className="mt-2 text-2xl font-semibold">{lib?.count ?? '…'} <span className="text-sm font-normal text-ink-400">{lib ? formatBytes(lib.bytes) : ''}</span></div>
+        </Link>
         <div className="panel p-4">
           <div className="section-title">Módulos disponíveis</div>
           <div className="mt-2 text-2xl font-semibold">{listModules().filter((m) => m.status === 'available').length} <span className="text-sm font-normal text-ink-400">de {listModules().length}</span></div>

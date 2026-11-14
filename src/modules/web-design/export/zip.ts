@@ -1,6 +1,6 @@
-import type { FileMap } from './html';
+export type ZipEntries = Record<string, string | Uint8Array>;
 
-export async function zipFiles(files: FileMap, root = ''): Promise<Blob> {
+export async function zipFiles(files: ZipEntries, root = ''): Promise<Blob> {
   const { default: JSZip } = await import('jszip');
   const zip = new JSZip();
   const base = root ? zip.folder(root)! : zip;

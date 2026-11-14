@@ -6,6 +6,7 @@ import { useOnline } from '@/hooks/useOnline';
 const NAV = [
   { to: '/', label: 'Dashboard', icon: '⌂', end: true },
   { to: '/projects', label: 'Projetos', icon: '▤' },
+  { to: '/assets', label: 'Biblioteca', icon: '◫' },
   { to: '/templates', label: 'Modelos', icon: '❏' },
   { to: '/history', label: 'Histórico', icon: '↺' },
   { to: '/storage', label: 'Armazenamento', icon: '⛁' },
