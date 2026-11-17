@@ -3,7 +3,9 @@ import { useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { CATEGORY_LABELS, WEAPONS, type Category } from '@/modules/studio-3d/weapons/catalog';
 import { useArsenal, weaponById } from '../store';
-import { Btn, FOCUS, Section, Segmented, Slider, useProfile } from './ui';
+import { hasWebGPU } from '@/core/ai/runtime';
+import { downloadSizeMB } from '@/core/ai/models';
+import { Btn, FOCUS, Section, Segmented, Slider, Toggle, useProfile } from './ui';
 
 export const EXAMPLES = [
   'Fuzil de assalto tático cal. 5.56 com acabamento cerakote preto fosco e mira holográfica',
@@ -22,7 +24,9 @@ export const EXAMPLES = [
  */
 export function PromptPanel() {
   const p = useProfile();
-  const { prompt, status, understood, ignored, imageLength } = useArsenal(useShallow((s) => ({ prompt: s.prompt, status: s.status, understood: s.understood, ignored: s.ignored, imageLength: s.imageLength })));
+  const { prompt, status, understood, ignored, imageLength, imageMode, useAI, relief } = useArsenal(
+    useShallow((s) => ({ prompt: s.prompt, status: s.status, understood: s.understood, ignored: s.ignored, imageLength: s.imageLength, imageMode: s.imageMode, useAI: s.useAI, relief: s.relief })),
+  );
   const [text, setText] = useState(prompt || EXAMPLES[0]);
   const file = useRef<HTMLInputElement>(null);
   const busy = status.kind === 'busy';
@@ -50,7 +54,7 @@ export function PromptPanel() {
           <Wand2 size={16} /> Gerar a partir do texto
         </Btn>
         <Btn onClick={() => file.current?.click()} disabled={busy} data-testid="arsenal-image">
-          <ImageUp size={16} /> Imagem → 3D
+          <ImageUp size={16} /> {imageMode === 'foto' ? 'Foto → 3D (IA)' : 'Imagem → 3D'}
         </Btn>
         <input
           ref={file}
@@ -66,6 +70,26 @@ export function PromptPanel() {
           }}
         />
       </div>
+      <Segmented
+        label="Imagem → 3D"
+        value={imageMode}
+        options={[
+          { id: 'foto', label: 'Foto realista (textura + relevo)' },
+          { id: 'silhueta', label: 'Silhueta extrudada' },
+        ]}
+        onChange={(v) => useArsenal.getState().set({ imageMode: v })}
+      />
+      {imageMode === 'foto' && (
+        <>
+          <Toggle label={`IA no aparelho (${hasWebGPU() ? 'GPU' : 'CPU'})`} checked={useAI} onChange={(v) => useArsenal.getState().set({ useAI: v })} />
+          <Slider label="Profundidade do relevo" value={relief} min={0} max={0.06} step={0.002} format={(v) => `${(v * imageLength * 100).toFixed(1)} cm`} onChange={(v) => useArsenal.getState().set({ relief: v })} />
+          {useAI && (
+            <p className={`leading-snug text-zinc-400 ${p === 'tv' ? 'text-sm' : 'text-[10px]'}`}>
+              Modelos abertos (U²-Netp e Depth Anything V2) rodam no seu aparelho. Na primeira vez são baixados (~{Math.round(downloadSizeMB(hasWebGPU()))} MB) e depois funcionam offline.
+            </p>
+          )}
+        </>
+      )}
       <Slider label="Comprimento real (Imagem → 3D)" value={imageLength} min={0.15} max={2} step={0.05} format={(v) => `${Math.round(v * 100)} cm`} onChange={(v) => useArsenal.getState().set({ imageLength: v })} />
       <details className="text-zinc-400">
         <summary className={`cursor-pointer rounded ${p === 'tv' ? 'text-base' : 'text-xs'} ${FOCUS}`}>Exemplos de prompt</summary>
@@ -89,7 +113,7 @@ export function PromptPanel() {
         </div>
       )}
       <p className={`leading-snug text-zinc-500 ${p === 'tv' ? 'text-sm' : 'text-[10px]'}`}>
-        Processado no aparelho, sem servidor e sem IA externa: o texto é interpretado por vocabulário técnico e a imagem vira um sólido pela silhueta (foto de lado, fundo liso ou PNG transparente).
+        Tudo é processado no aparelho, sem servidor: o texto é interpretado por vocabulário técnico; a foto (de lado, de preferência com fundo liso) vira um modelo 3D com a própria foto como textura, recorte e relevo por IA local.
       </p>
     </Section>
   );

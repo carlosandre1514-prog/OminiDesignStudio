@@ -140,6 +140,7 @@ const tris = async (page) => Number((await page.getByTestId('arsenal-tris').inne
     g.fillRect(145, 90, 60, 45);
     return c.toDataURL('image/png').split(',')[1];
   });
+  await page.getByRole('group', { name: 'Imagem → 3D' }).getByRole('button', { name: 'Silhueta extrudada' }).click();
   await page.getByTestId('arsenal-image-input').setInputFiles({ name: 'pistola.png', mimeType: 'image/png', buffer: Buffer.from(png, 'base64') });
   assert(await until(async () => (await parts.innerText()).includes('Corpo (silhueta)') && /Pronto/.test(await statusText(page))), 'PC: Imagem → 3D gera o sólido pela silhueta');
   assert(/Aberturas: 1/.test(await page.getByTestId('arsenal-understood').innerText()), 'PC: abertura do guarda-mato detectada na imagem');

@@ -104,6 +104,12 @@ _Última atualização: 2026-11-14 (Fase 4 — 3D Design Studio)_
 - Acabamentos padrão realistas por arma, desgaste de bordas só em quinas convexas (lascado), texturas de borracha pontilhada. O interpretador de texto usa os modelos HD para “fuzil/AR-15/M4/pistola/9mm”.
 - Texturas do Estúdio aplicáveis por parte da arma no Arsenal, nas exportações e no Estúdio 3D.
 
+### ✅ IA no aparelho (sem servidor, sem API)
+- ONNX Runtime Web (WebGPU ou WASM) com modelos abertos baixados uma vez e guardados offline: U²-Netp (recorte, Apache-2.0) e Depth Anything V2 small (profundidade, Apache-2.0).
+- **Arsenal → Foto → 3D (IA)**: a foto vira sólido 3D estanque em tamanho real, com relevo pela profundidade, bordas arredondadas e a própria foto como textura (mais o mapa normal da profundidade). Exporta GLB/GLTF/OBJ e abre no Estúdio 3D com a textura mapeada.
+- **Estúdio de Texturas → Foto → Material (IA)**: foto de superfície → material PBR sem emenda com relevo por IA, em camadas editáveis.
+- Sem IA (ou se a IA falhar) há reserva automática: recorte por transparência ou cor de fundo, profundidade por contorno e brilho. Detalhes em `docs/IA.md`.
+
 ### ✅ Publicação
 - GitHub Pages via GitHub Actions (`.github/workflows/pages.yml`): testes + build no subcaminho `/OminiDesignStudio/` + deploy a cada push. Supabase do projeto configurado no build.
 - App preparado para subcaminho: rotas (`basename`), service worker e manifest com escopo relativo, ícones, links de e-mail do Supabase apontando para `<base>/account`, `404.html` para links diretos.

@@ -139,6 +139,7 @@ export async function resolveBitmaps(doc: TextureDoc): Promise<BitmapSet> {
       out[`mask:${l.id}`] = b;
     } else if (l.mask.kind === 'image' && l.mask.imageId) out[`mask:${l.id}`] = await assetBitmap(l.mask.imageId);
     if (l.content.imageId) out[`color:${l.id}`] = await assetBitmap(l.content.imageId);
+    if (l.content.heightImageId) out[`height:${l.id}`] = await assetBitmap(l.content.heightImageId);
   }
   return out;
 }

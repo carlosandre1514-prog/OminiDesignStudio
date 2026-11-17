@@ -3,6 +3,7 @@ import { buildWeapon, defaultParams, randomParams, WEAPONS, type Params, type We
 import { DEFAULT_FINISH, materialFor, texturesFor, type Finish } from '@/modules/studio-3d/weapons/textures';
 import { parsePrompt, type CamoPattern } from './lib/promptParser';
 import { silhouetteToMesh } from './lib/silhouette';
+import type { PhotoTexture } from './lib/photo3d';
 
 /** Weapon parts with a stable key (names can repeat across generations). */
 export interface Part extends WeaponPart {
@@ -21,6 +22,13 @@ export interface ArsenalState {
   imagePart: WeaponPart | null;
   imageName: string;
   imageLength: number;
+  /** 'foto' = AI photo → textured 3D; 'silhueta' = extruded outline. */
+  imageMode: 'foto' | 'silhueta';
+  useAI: boolean;
+  /** Relief depth for photo → 3D (fraction of length). */
+  relief: number;
+  /** Photo texture of the current photo-based model. */
+  photo: PhotoTexture | null;
   parts: Part[];
   // --- surface
   finish: Finish;
@@ -88,6 +96,10 @@ export const useArsenal = create<ArsenalState>((set, get) => {
     imagePart: null,
     imageName: '',
     imageLength: 0.9,
+    imageMode: 'foto',
+    useAI: true,
+    relief: 0.02,
+    photo: null,
     parts: partsFor({ source: 'catalog', imagePart: null, weaponId: INITIAL, params: initialParams, seed: 1 }),
     finish: { ...DEFAULT_FINISH, ...weaponById(INITIAL).finish },
     camo: { pattern: 'nenhum', color: '#3a3d41' },
@@ -154,6 +166,24 @@ export const useArsenal = create<ArsenalState>((set, get) => {
 
     async generateFromImage(file, name) {
       set({ status: { kind: 'busy', text: 'Lendo imagem…' } });
+      if (get().imageMode === 'foto') {
+        try {
+          const { photoTo3D } = await import('./lib/photo3d');
+          const r = await photoTo3D(file, {
+            length: get().imageLength,
+            relief: get().relief,
+            useAI: get().useAI,
+            onStage: (text) => set({ status: { kind: 'busy', text } }),
+            onProgress: ({ model, loaded, total }) =>
+              set({ status: { kind: 'busy', text: `Baixando IA ${model}: ${(loaded / 1048576).toFixed(1)} de ${(total / 1048576).toFixed(1)} MB (só na 1ª vez)` } }),
+          });
+          rebuild({ source: 'image', imagePart: r.part, imageName: name });
+          set({ photo: r.texture, understood: [`Foto: ${name}`, ...r.notes], ignored: [], status: { kind: 'ready', text: 'Pronto' } });
+        } catch (e) {
+          set({ status: { kind: 'error', text: e instanceof Error ? e.message : 'Falha ao processar a foto' } });
+        }
+        return;
+      }
       try {
         const bmp = await createImageBitmap(file);
         const scale = Math.min(1, 360 / Math.max(bmp.width, bmp.height));
@@ -174,6 +204,7 @@ export const useArsenal = create<ArsenalState>((set, get) => {
         const imagePart: WeaponPart = { name: 'Corpo (silhueta)', slot: 'polymer', mesh: r.mesh, shading: 'auto' };
         rebuild({ source: 'image', imagePart, imageName: name });
         set({
+          photo: null,
           understood: [`Imagem: ${name}`, `Separação: ${r.method === 'alpha' ? 'transparência' : 'cor de fundo'}`, `Contorno: ${r.outline.length} pontos`, `Aberturas: ${r.holes.length}`],
           ignored: [],
           status: { kind: 'ready', text: 'Pronto' },

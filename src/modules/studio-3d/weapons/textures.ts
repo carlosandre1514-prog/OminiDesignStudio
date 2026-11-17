@@ -105,6 +105,8 @@ export function materialFor(slot: Slot, f: Finish): MaterialSpec {
       return { key: 'anodizado', name: 'Alumínio anodizado', color: '#ffffff', metalness: 0.9, roughness: 1, pattern: { kind: 'blackened', dark: [26, 27, 30], light: [52, 54, 58], rough: [0.42, 0.55], wear: w * 0.6, seed: 71 } };
     case 'bright':
       return { key: 'aco-claro', name: 'Aço níquel-boro', color: '#ffffff', metalness: 1, roughness: 1, pattern: { kind: 'brushed', dark: [150, 152, 156], light: [205, 207, 210], rough: [0.2, 0.32], wear: w * 0.5, seed: 72 } };
+    case 'photo':
+      return { key: 'foto', name: 'Textura da foto', color: '#ffffff', metalness: 0.25, roughness: 0.55 };
     case 'lens':
       return { key: 'lente', name: 'Lente', color: '#8fb8cc', metalness: 0, roughness: 0.04, opacity: 0.3 };
     case 'string':

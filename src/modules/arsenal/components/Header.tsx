@@ -14,7 +14,7 @@ const PROFILES: { id: DeviceProfile; label: string; icon: typeof Monitor }[] = [
 /** Title, generation status, FPS and polygon counters, layout switcher. */
 export function Header({ forced, onProfile }: { forced: DeviceProfile | null; onProfile: (p: DeviceProfile | null) => void }) {
   const p = useProfile();
-  const { status, fps, tris, name } = useArsenal(useShallow((s) => ({ status: s.status, fps: s.stats.fps, tris: s.stats.tris, name: s.source === 'image' ? `Silhueta: ${s.imageName}` : weaponById(s.weaponId).name })));
+  const { status, fps, tris, name } = useArsenal(useShallow((s) => ({ status: s.status, fps: s.stats.fps, tris: s.stats.tris, name: s.source === 'image' ? `${s.photo ? 'Foto 3D' : 'Silhueta'}: ${s.imageName}` : weaponById(s.weaponId).name })));
   const big = p === 'tv';
   return (
     <header className={`flex items-center ${p === 'mobile' ? 'gap-1.5' : 'gap-3'} border-b border-white/10 bg-[#0b0e13] ${big ? 'px-6 py-3' : 'px-3 py-2'}`}>

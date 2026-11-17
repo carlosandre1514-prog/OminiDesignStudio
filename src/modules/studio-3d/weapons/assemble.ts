@@ -12,6 +12,9 @@ export interface TextureIds {
   normalMap?: string;
   metalnessMap?: string;
   aoMap?: string;
+  /** Explicit UV transform (photo textures mapped onto their model rectangle). */
+  repeat?: [number, number];
+  offset?: [number, number];
 }
 
 /** Weapons modelled along +X (guns, crossbows) get their texture direction rotated so grain/brushing follows the length. */
@@ -42,8 +45,9 @@ export function materialDef(spec: MaterialSpec, tex: TextureIds | undefined, hor
       m.metalness = 1;
       m.roughness = 1;
     }
-    m.uvRepeat = [UV_REPEAT, UV_REPEAT];
-    m.uvRotation = horizontal ? 90 : 0;
+    m.uvRepeat = tex.repeat ?? [UV_REPEAT, UV_REPEAT];
+    m.uvOffset = tex.offset ?? [0, 0];
+    m.uvRotation = tex.repeat ? 0 : horizontal ? 90 : 0;
   }
   return m;
 }
@@ -89,7 +93,7 @@ export function assembleWeapon(
     o.geometry = { kind: 'mesh', mesh: P.compact(part.mesh) };
     o.position = [0, 0, 0];
     o.shading = part.shading ?? 'auto';
-    o.uv = 'box';
+    o.uv = part.uv ?? 'box';
     o.parentId = group.id;
     o.materialId = matIds.get(materialFor(part.slot, finish).key);
     return o;

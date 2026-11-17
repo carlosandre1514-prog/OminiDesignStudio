@@ -8,6 +8,7 @@ import { encodePng, materialFor, type Finish } from '@/modules/studio-3d/weapons
 import type { CamoPattern } from './promptParser';
 import { slotTextures } from '../canvas/useWeaponMaterials';
 import { textureProjectMaps } from './textureLink';
+import type { PhotoTexture } from './photo3d';
 import type { Slot } from '@/modules/studio-3d/weapons/catalog';
 
 export type ExportFormat = 'glb' | 'gltf' | 'obj';
@@ -103,6 +104,7 @@ export async function sendToStudio(
   camo: { pattern: CamoPattern; color: string },
   name: string,
   custom: Partial<Record<Slot, { id: string; name: string }>> = {},
+  photo: PhotoTexture | null = null,
 ): Promise<string> {
   const textures: Record<string, TextureIds> = {};
   const done = new Set<string>();
@@ -110,6 +112,29 @@ export async function sendToStudio(
     const spec = materialFor(p.slot, finish);
     if (done.has(spec.key)) continue;
     done.add(spec.key);
+    if (p.slot === 'photo' && photo) {
+      // Photo-based model: the photo is the colour map, mapped 1:1 onto the model rectangle.
+      const fr = photo.frame;
+      // Wanted: uv' = uv·r + o. The 3D studio uses texture.center = (0.5, 0.5), which turns the
+      // offset into o + (1 − r)·0.5, so pre-compensate: offset = o − (1 − r)·0.5.
+      const r: [number, number] = [1 / fr.w, 1 / fr.h];
+      const o: [number, number] = [-(fr.x0 + 0.5) / fr.w, -(fr.y0 + 0.5) / fr.h];
+      const ids: TextureIds = { repeat: r, offset: [o[0] - (1 - r[0]) * 0.5, o[1] - (1 - r[1]) * 0.5] };
+      const enc = async (img: PhotoTexture['color']) => {
+        const c = Object.assign(document.createElement('canvas'), { width: img.width, height: img.height });
+        c.getContext('2d')!.putImageData(new ImageData(new Uint8ClampedArray(img.data), img.width, img.height), 0, 0);
+        const blob = await new Promise<Blob | null>((r) => c.toBlob(r, 'image/png'));
+        if (!blob) throw new Error('Falha ao gerar PNG');
+        return blob.arrayBuffer();
+      };
+      for (const [map, img, label] of [['map', photo.color, 'cor'], ['normalMap', photo.normal, 'normal']] as const) {
+        const r = await importAssetBytes(`foto3d-${label}.png`, await enc(img), { name: `${name} — ${label}`, category: 'textures', tags: ['arma', 'arsenal', 'foto'] });
+        if (r.status === 'error') throw new Error(r.error);
+        ids[map] = r.asset.id;
+      }
+      textures[spec.key] = ids;
+      continue;
+    }
     const studio = custom[p.slot];
     if (studio) {
       // Texture Studio material: full PBR set (colour, roughness, metal, normal, AO)

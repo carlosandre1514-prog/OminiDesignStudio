@@ -6,13 +6,15 @@ import { buildAR15 } from './hd/ar15';
 import { buildPistolHD } from './hd/pistol';
 
 /** Material slot of a part; the finish chosen by the user decides the actual texture. */
-export type Slot = 'blade' | 'metal' | 'dark' | 'trim' | 'wood' | 'grip' | 'polymer' | 'string' | 'fletch' | 'glow' | 'crystal' | 'anodized' | 'bright' | 'lens';
+export type Slot = 'blade' | 'metal' | 'dark' | 'trim' | 'wood' | 'grip' | 'polymer' | 'string' | 'fletch' | 'glow' | 'crystal' | 'anodized' | 'bright' | 'lens' | 'photo';
 
 export interface WeaponPart {
   name: string;
   mesh: P.PolyMesh;
   slot: Slot;
   shading?: 'flat' | 'auto' | 'smooth';
+  /** UV projection (default: box). Photo-based parts use planarXY so the photo maps 1:1. */
+  uv?: 'box' | 'planarXY';
 }
 
 export type Category = 'melee' | 'firearm' | 'ranged' | 'scifi';

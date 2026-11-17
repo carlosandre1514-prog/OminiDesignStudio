@@ -208,7 +208,18 @@ export function evaluate(doc: TextureDoc, size: number, bitmaps: BitmapSet = {},
 
   layers.forEach((layer, li) => {
     const c = layer.content;
-    const val = c.pattern ? patternField(c.pattern, size) : null;
+    let val = c.pattern ? patternField(c.pattern, size) : null;
+    const hImg = c.heightImageId ? bitmaps[`height:${layer.id}`] : undefined;
+    if (hImg) {
+      // grayscale height image (e.g. AI depth of a photographed surface) replaces the pattern value
+      const hs = bitmapSampler(hImg);
+      val = new Float32Array(size * size);
+      for (let y = 0; y < size; y++)
+        for (let x = 0; x < size; x++) {
+          hs((x + 0.5) / size, (y + 0.5) / size, px);
+          val[y * size + x] = (px[0] + px[1] + px[2]) / 3;
+        }
+    }
     const mask = layerMask(layer, size, height, bitmaps);
     const stops = c.colors.map(hexRgb);
     const img = c.imageId ? bitmaps[`color:${layer.id}`] : undefined;

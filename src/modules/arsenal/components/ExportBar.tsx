@@ -43,10 +43,10 @@ export function ExportBar({ compact = false }: { compact?: boolean }) {
     setBusy('studio');
     try {
       const s = useArsenal.getState();
-      const name = s.source === 'image' ? `Silhueta ${s.imageName}` : weaponById(s.weaponId).name;
+      const name = s.source === 'image' ? `${s.photo ? 'Foto 3D' : 'Silhueta'} ${s.imageName.replace(/\.[^.]+$/, '')}` : weaponById(s.weaponId).name;
       // An extruded silhouette is laid out like a firearm (along X).
       const weapon = s.source === 'image' ? { ...weaponById('pistol'), name } : weaponById(s.weaponId);
-      const id = await sendToStudio(weapon, s.parts, { ...s.finish }, s.camo, `${name} (Arsenal)`, s.custom);
+      const id = await sendToStudio(weapon, s.parts, { ...s.finish }, s.camo, `${name} (Arsenal)`, s.custom, s.source === 'image' ? s.photo : null);
       toast.success('Projeto 3D criado com a arma');
       navigate(`/project/${id}/3d-studio`);
     } catch (e) {

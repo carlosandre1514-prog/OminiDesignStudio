@@ -5,6 +5,7 @@ import { toast } from '@/ui/toast';
 import { DocSettings, LayerProps } from './components/LayerProps';
 import { LayersPanel } from './components/LayersPanel';
 import { ExportTextures } from './components/ExportTextures';
+import { PhotoMaterialDialog } from './components/PhotoMaterialDialog';
 import { Preview2D } from './components/Preview2D';
 import { Preview3D } from './components/Preview3D';
 import { usePreview } from './components/usePreview';
@@ -41,6 +42,7 @@ export default function TextureStudio({ projectId }: ModuleEditorProps) {
   const canRedo = useTextures((s) => s.history.future.length > 0);
   const [panel, setPanel] = useState<'layers' | 'props' | null>(null);
   const [exporting, setExporting] = useState(false);
+  const [photoMat, setPhotoMat] = useState(false);
   usePreview();
 
   useEffect(() => {
@@ -98,6 +100,7 @@ export default function TextureStudio({ projectId }: ModuleEditorProps) {
             </optgroup>
           ))}
         </select>
+        <button className="btn-outline px-2 py-1 text-xs" onClick={() => setPhotoMat(true)} data-testid="photo-material">📷 Foto → Material (IA)</button>
         <span className="mx-1 h-5 w-px bg-ink-700" />
         {(['3d', '2d'] as const).map((v) => (
           <button key={v} className="icon-btn w-auto px-2 text-xs" data-active={view === v} onClick={() => st().set({ view: v })}>
@@ -122,6 +125,7 @@ export default function TextureStudio({ projectId }: ModuleEditorProps) {
         </aside>
       </div>
       {exporting && <ExportTextures onClose={() => setExporting(false)} />}
+      {photoMat && <PhotoMaterialDialog onClose={() => setPhotoMat(false)} />}
     </div>
   );
 }

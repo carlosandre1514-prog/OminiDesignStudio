@@ -54,11 +54,12 @@ export function WeaponModel() {
   const custom = useArsenal((s) => s.custom);
   const customScale = useArsenal((s) => s.customScale);
   const customMaps = useCustomMaps(custom);
-  const materials = useWeaponMaterials(parts.map((p) => p.slot), { finish, camo, edgeWear, roughness, metalness, horizontal, custom: customMaps, customScale });
+  const photo = useArsenal((s) => s.photo);
+  const materials = useWeaponMaterials(parts.map((p) => p.slot), { finish, camo, edgeWear, roughness, metalness, horizontal, custom: customMaps, customScale, photo });
 
   const model = useMemo(() => {
     const items = parts.map((p) => {
-      const geometry = toBufferGeometry(p.mesh, { shading: p.shading ?? 'auto', uv: 'box' });
+      const geometry = toBufferGeometry(p.mesh, { shading: p.shading ?? 'auto', uv: p.uv ?? 'box' });
       const wear = edgeWearAttributes(p.mesh);
       geometry.setAttribute('bary', new THREE.BufferAttribute(wear.bary, 3));
       geometry.setAttribute('edgeH', new THREE.BufferAttribute(wear.edgeH, 3));

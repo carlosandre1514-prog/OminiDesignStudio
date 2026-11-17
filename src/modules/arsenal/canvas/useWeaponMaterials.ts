@@ -4,6 +4,7 @@ import type { Slot } from '@/modules/studio-3d/weapons/catalog';
 import { materialFor, texturesFor, type Finish, type MaterialSpec, type TextureSet } from '@/modules/studio-3d/weapons/textures';
 import type { TextureMaps } from '@/modules/texture-studio/engine/compose';
 import type { CamoPattern } from '../lib/promptParser';
+import type { PhotoTexture } from '../lib/photo3d';
 import { applyEdgeWear, camouflage, createWearUniforms, type WearUniforms } from '../lib/surface';
 
 /** Texture tile: 25 cm (UVs are in metres with box projection). */
@@ -34,6 +35,26 @@ export interface SurfaceSettings {
   custom?: Partial<Record<Slot, TextureMaps>>;
   /** Repeats per metre for custom textures. */
   customScale?: number;
+  /** Photo texture for photo-based models (slot 'photo', planarXY UVs). */
+  photo?: PhotoTexture | null;
+}
+
+/** Texture of a photo mapped onto its model rectangle (planarXY: u = x + 0.5, v = y + 0.5). */
+function photoTexture(img: { width: number; height: number; data: Uint8ClampedArray | Uint8Array }, frame: PhotoTexture['frame'], srgb: boolean) {
+  const row = img.width * 4;
+  const flipped = new Uint8Array(img.data.length);
+  for (let y = 0; y < img.height; y++) flipped.set(img.data.subarray(y * row, y * row + row), (img.height - 1 - y) * row);
+  const t = new THREE.DataTexture(flipped, img.width, img.height, THREE.RGBAFormat);
+  t.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace;
+  t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
+  t.repeat.set(1 / frame.w, 1 / frame.h);
+  t.offset.set(-(frame.x0 + 0.5) / frame.w, -(frame.y0 + 0.5) / frame.h);
+  t.magFilter = THREE.LinearFilter;
+  t.minFilter = THREE.LinearMipmapLinearFilter;
+  t.generateMipmaps = true;
+  t.anisotropy = 8;
+  t.needsUpdate = true;
+  return t;
 }
 
 /** DataTexture from studio maps; rows flipped so the image top maps to v = 1. */
@@ -120,8 +141,13 @@ export function useWeaponMaterials(slots: Slot[], s: SurfaceSettings) {
         m.opacity = spec.opacity;
       }
       const studio = s.custom?.[slot];
-      const tex = studio ? null : slotTextures(slot, spec, s);
-      if (studio) {
+      const tex = studio || slot === 'photo' ? null : slotTextures(slot, spec, s);
+      if (slot === 'photo' && s.photo) {
+        m.map = photoTexture(s.photo.color, s.photo.frame, true);
+        m.normalMap = photoTexture(s.photo.normal, s.photo.frame, false);
+        m.normalScale.set(1, 1);
+        m.name = 'Textura da foto';
+      } else if (studio) {
         const rep = s.customScale ?? 8;
         m.color.set('#ffffff');
         m.metalness = 1;
@@ -150,7 +176,7 @@ export function useWeaponMaterials(slots: Slot[], s: SurfaceSettings) {
     }
     return map;
     // eslint-disable-next-line react-hooks/exhaustive-deps -- finish/coat captured via keys
-  }, [slotList, JSON.stringify(s.finish), coatKey, s.horizontal, uniforms, s.custom, s.customScale]);
+  }, [slotList, JSON.stringify(s.finish), coatKey, s.horizontal, uniforms, s.custom, s.customScale, s.photo]);
 
   useEffect(
     () => () =>

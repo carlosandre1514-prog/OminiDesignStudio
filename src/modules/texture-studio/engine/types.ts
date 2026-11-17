@@ -35,6 +35,8 @@ export interface LayerContent {
   stepped: boolean;
   /** Optional image (Asset Library id) used as colour, tiled. */
   imageId?: string;
+  /** Optional grayscale height image (Asset Library id): drives relief/roughness instead of the pattern. */
+  heightImageId?: string;
   roughA: number;
   roughB: number;
   metalA: number;
