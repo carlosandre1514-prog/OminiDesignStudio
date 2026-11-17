@@ -73,7 +73,7 @@ const tris = async (page) => Number((await page.getByTestId('arsenal-tris').inne
   // ---- text-to-3D
   await page.getByTestId('arsenal-prompt').fill('Rifle de precisão .308 com luneta, bipé e supressor, camuflagem woodland, desgastado');
   await page.getByTestId('arsenal-generate').click();
-  assert(await until(async () => (await page.getByTestId('arsenal-model-name').innerText()) === 'Rifle de precisão' && /Pronto/.test(await statusText(page))), 'PC: prompt gera rifle de precisão e status volta a "Pronto"');
+  assert(await until(async () => (await page.getByTestId('arsenal-model-name').innerText()) === 'Rifle de precisão (HD)' && /Pronto/.test(await statusText(page))), 'PC: prompt gera rifle de precisão e status volta a "Pronto"');
   const und = await page.getByTestId('arsenal-understood').innerText();
   assert(/Bipé/.test(und) && /Supressor/.test(und) && /woodland/i.test(und), `PC: interpretação mostrada (${und.replace(/\s+/g, ' ').slice(0, 90)}…)`);
   await page.waitForTimeout(800);

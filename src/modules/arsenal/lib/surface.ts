@@ -6,7 +6,7 @@ import type { CamoPattern } from './promptParser';
 // ---------------------------------------------------------------- edge wear
 
 /** Dihedral angle above which a polygon edge counts as a hard (wearable) edge. */
-export const WEAR_EDGE_DEG = 25;
+export const WEAR_EDGE_DEG = 35;
 
 /**
  * Per-corner attributes for metric edge wear, in the exact corner order of `toBufferGeometry`
@@ -109,7 +109,7 @@ float wearMask(){
   // Chipped, broken bands: medium noise decides where the edge is worn at all, fine noise frays the border.
   float patches = wNoise(vWearPos * 420.0) * 0.65 + wNoise(vWearPos * 95.0) * 0.35;
   float fray = wNoise(vWearPos * 2600.0);
-  float present = smoothstep(0.62 - uWear * 0.45, 0.72 - uWear * 0.45, patches);
+  float present = smoothstep(0.5 - uWear * 0.45, 0.6 - uWear * 0.45, patches);
   float width = ${MAX_WEAR_WIDTH.toFixed(5)} * uWear * (0.35 + 1.3 * patches) * (0.6 + 0.8 * fray);
   return (1.0 - smoothstep(width * 0.5, width, d)) * present;
 }`,
@@ -118,7 +118,7 @@ float wearMask(){
       .replace('#include <metalnessmap_fragment>', '#include <metalnessmap_fragment>\nmetalnessFactor = mix(metalnessFactor, 1.0, wm * uBareMetal);')
       .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = mix(roughnessFactor, 0.3, wm * uBareMetal);');
   };
-  mat.customProgramCacheKey = () => 'edge-wear-v3';
+  mat.customProgramCacheKey = () => 'edge-wear-v4';
   mat.needsUpdate = true;
 }
 

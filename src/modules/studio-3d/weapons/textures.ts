@@ -64,7 +64,7 @@ export function materialFor(slot: Slot, f: Finish): MaterialSpec {
     const rough = base === 'blade' ? 0 : 0.08;
     switch (f.steel) {
       case 'escuro':
-        return { key: `${base}-escuro`, name: 'Aço enegrecido', color: '#ffffff', metalness: 0.85, roughness: 1, pattern: { kind: 'blackened', dark: [28, 29, 32], light: [70, 72, 78], rough: [0.38 + rough, 0.6], wear: w, seed: 11 } };
+        return { key: `${base}-escuro`, name: 'Aço enegrecido', color: '#ffffff', metalness: 0.85, roughness: 1, pattern: { kind: 'blackened', dark: [46, 48, 52], light: [86, 89, 95], rough: [0.34 + rough, 0.55], wear: w, seed: 11 } };
       case 'damasco':
         return { key: `${base}-damasco`, name: 'Aço damasco', color: '#ffffff', metalness: 1, roughness: 1, pattern: { kind: 'damascus', dark: [70, 72, 76], light: [205, 208, 212], rough: [0.18 + rough, 0.42], wear: w, seed: 12 } };
       case 'gasto':
@@ -79,30 +79,30 @@ export function materialFor(slot: Slot, f: Finish): MaterialSpec {
     case 'metal':
       return steel('metal');
     case 'dark':
-      return { key: 'parkerizado', name: 'Metal fosfatizado', color: '#ffffff', metalness: 0.7, roughness: 1, pattern: { kind: 'blackened', dark: [30, 31, 33], light: [62, 64, 66], rough: [0.45, 0.7], wear: w, seed: 21 } };
+      return { key: 'parkerizado', name: 'Metal fosfatizado', color: '#ffffff', metalness: 0.75, roughness: 1, pattern: { kind: 'blackened', dark: [50, 52, 53], light: [80, 83, 84], rough: [0.42, 0.62], wear: w, seed: 21 } };
     case 'trim': {
       const pal: Record<Finish['trim'], [RGB, RGB]> = { ouro: [[160, 112, 30], [255, 214, 120]], latao: [[130, 98, 40], [228, 196, 120]], bronze: [[90, 56, 30], [196, 140, 90]], aco: [[120, 124, 130], [210, 214, 220]] };
       const [dark, light] = pal[f.trim];
       return { key: `trim-${f.trim}`, name: FINISH_LABELS.trim.options[f.trim], color: '#ffffff', metalness: 1, roughness: 1, pattern: { kind: 'hammered', dark, light, rough: [0.2, 0.45], wear: w, seed: 31 } };
     }
     case 'wood': {
-      const pal: Record<Finish['wood'], [RGB, RGB]> = { carvalho: [[104, 70, 38], [176, 130, 82]], nogueira: [[58, 34, 20], [124, 80, 48]], ebano: [[18, 14, 12], [58, 44, 36]], freixo: [[160, 126, 88], [226, 196, 150]] };
+      const pal: Record<Finish['wood'], [RGB, RGB]> = { carvalho: [[88, 44, 24], [146, 82, 44]], nogueira: [[58, 34, 20], [124, 80, 48]], ebano: [[18, 14, 12], [58, 44, 36]], freixo: [[160, 126, 88], [226, 196, 150]] };
       const [dark, light] = pal[f.wood];
       return { key: `wood-${f.wood}`, name: FINISH_LABELS.wood.options[f.wood], color: '#ffffff', metalness: 0, roughness: 1, pattern: { kind: 'wood', dark, light, rough: [0.45, 0.75], wear: w, seed: 41 } };
     }
     case 'grip': {
       const kind: Pattern['kind'] = f.grip === 'tecido' ? 'wrap' : f.grip === 'borracha' ? 'rubber' : 'leather';
-      const pal: Record<Finish['grip'], [RGB, RGB]> = { 'couro-marrom': [[52, 30, 18], [120, 74, 44]], 'couro-preto': [[14, 13, 13], [52, 48, 46]], tecido: [[24, 22, 26], [92, 86, 96]], borracha: [[18, 18, 19], [44, 44, 46]] };
+      const pal: Record<Finish['grip'], [RGB, RGB]> = { 'couro-marrom': [[52, 30, 18], [120, 74, 44]], 'couro-preto': [[14, 13, 13], [52, 48, 46]], tecido: [[24, 22, 26], [92, 86, 96]], borracha: [[30, 31, 33], [58, 59, 62]] };
       const [dark, light] = pal[f.grip];
       return { key: `grip-${f.grip}`, name: FINISH_LABELS.grip.options[f.grip], color: '#ffffff', metalness: 0, roughness: 1, normalScale: 1.4, pattern: { kind, dark, light, rough: [0.55, 0.9], wear: w, seed: 51 } };
     }
     case 'polymer': {
-      const pal: Record<Finish['polymer'], [RGB, RGB]> = { preto: [[20, 21, 22], [44, 45, 47]], areia: [[150, 124, 88], [196, 170, 128]], oliva: [[56, 62, 38], [96, 104, 66]], cinza: [[70, 72, 74], [118, 120, 122]] };
+      const pal: Record<Finish['polymer'], [RGB, RGB]> = { preto: [[36, 37, 39], [60, 61, 64]], areia: [[150, 124, 88], [196, 170, 128]], oliva: [[56, 62, 38], [96, 104, 66]], cinza: [[70, 72, 74], [118, 120, 122]] };
       const [dark, light] = pal[f.polymer];
       return { key: `polymer-${f.polymer}`, name: `Polímero ${FINISH_LABELS.polymer.options[f.polymer].toLowerCase()}`, color: '#ffffff', metalness: 0, roughness: 1, pattern: { kind: 'polymer', dark, light, rough: [0.55, 0.8], wear: w, seed: 61 } };
     }
     case 'anodized':
-      return { key: 'anodizado', name: 'Alumínio anodizado', color: '#ffffff', metalness: 0.9, roughness: 1, pattern: { kind: 'blackened', dark: [26, 27, 30], light: [52, 54, 58], rough: [0.42, 0.55], wear: w * 0.6, seed: 71 } };
+      return { key: 'anodizado', name: 'Alumínio anodizado', color: '#ffffff', metalness: 0.9, roughness: 1, pattern: { kind: 'blackened', dark: [54, 57, 62], light: [82, 86, 92], rough: [0.34, 0.48], wear: w * 0.6, seed: 71 } };
     case 'bright':
       return { key: 'aco-claro', name: 'Aço níquel-boro', color: '#ffffff', metalness: 1, roughness: 1, pattern: { kind: 'brushed', dark: [150, 152, 156], light: [205, 207, 210], rough: [0.2, 0.32], wear: w * 0.5, seed: 72 } };
     case 'photo':
@@ -200,7 +200,7 @@ function sampler(p: Pattern) {
   const fbm2 = makeFbm(p.seed + 7);
   const cells = makeCells(p.seed + 3, 12);
   const big = makeCells(p.seed + 5, 5);
-  const fine = makeCells(p.seed + 9, 72);
+  const fine = makeCells(p.seed + 9, 150);
   return (u: number, v: number): { h: number; mix: number; rough: number; dirt: number } => {
     const grime = clamp01((fbm2(u, v, 3, 3) - 0.55) * 3) * p.wear;
     let h = 0.5;
@@ -225,7 +225,7 @@ function sampler(p: Pattern) {
       }
       case 'blackened': {
         const n = fbm(u, v, 8, 8);
-        mix = n * 0.7 + fbm2(u, v, 32, 32, 2) * 0.3;
+        mix = 0.3 + n * 0.4 + fbm2(u, v, 32, 32, 2) * 0.2;
         h = 0.5 + (fbm(u, v, 48, 48, 2) - 0.5) * 0.05;
         rough = 0.35 + mix * 0.65;
         break;
@@ -279,7 +279,7 @@ function sampler(p: Pattern) {
       case 'polymer': {
         const n = fbm(u, v, 64, 64, 2);
         h = 0.5 + (n - 0.5) * 0.25;
-        mix = 0.45 + (fbm2(u, v, 6, 6) - 0.5) * 0.4 + (n - 0.5) * 0.2;
+        mix = 0.45 + (fbm2(u, v, 6, 6) - 0.5) * 0.15 + (n - 0.5) * 0.12;
         rough = 0.5 + n * 0.5;
         break;
       }

@@ -74,41 +74,45 @@ export function buildAR15(p: Params): WeaponPart[] {
   add('Botão do carregador', 'dark', B.merge(pinZ(0.058, -0.038, HW + 0.0012, 0.0042, 0.0026), side(B.circle(0.0062, 20, 0.058, -0.038), HW - 0.0002, HW + 0.0006, 0.0003, [B.circle(0.0047, 20, 0.058, -0.038)], 1)));
 
   // ------------------------------------------------------------------ grip, buffer tube, stock
+  // A2-type pistol grip: ~105 mm along its axis, finger nub, rounded back, raked ~23°
   const gripLocal: V2[] = [
-    [0.016, 0],
-    [0.0165, -0.018],
-    [0.0195, -0.03],
-    [0.0165, -0.04],
-    [0.016, -0.07],
-    [0.012, -0.084],
-    [0.004, -0.088],
-    [-0.01, -0.086],
-    [-0.016, -0.076],
-    [-0.017, -0.03],
-    [-0.016, 0],
+    [0.017, 0],
+    [0.0158, -0.02],
+    [0.021, -0.034],
+    [0.0165, -0.046],
+    [0.0158, -0.08],
+    [0.0128, -0.096],
+    [0.004, -0.104],
+    [-0.009, -0.102],
+    [-0.0165, -0.092],
+    [-0.019, -0.05],
+    [-0.0195, -0.012],
+    [-0.0135, 0],
   ];
-  add('Empunhadura', 'polymer', place(side(gripLocal, -0.0145, 0.0145, 0.0055, [], 3), T.at(0.006, -0.041, 0), T.rz(-0.36)));
+  add('Empunhadura', 'polymer', place(side(gripLocal, -0.0138, 0.0138, 0.006, [], 3), T.at(0.006, -0.0405, 0), T.rz(-0.4)));
   add('Tubo do amortecedor', 'dark', B.merge(turnX([[0, -0.192], [0.0136, -0.19], [0.0146, -0.186], [0.0146, -0.012], [0.0146, 0]], 0.0035, 0, 32), tubeX([[0.0146, -0.012], [0.018, -0.012], [0.018, -0.004], [0.0146, -0.004]], 0.0035, 0, 12)));
   add('Placa traseira', 'dark', side([[-0.0135, -0.013], [-0.0115, -0.013], [-0.0115, 0.02], [-0.0135, 0.02]], -0.014, 0.014, 0.0005));
   if (s(p, 'stock') !== 'nenhuma') {
+    // M4-type collapsible stock riding on the buffer tube (top flush with the tube, angled underside)
     const pos = n(p, 'stockPos');
-    const x0 = -0.095 - pos;
+    const xf = -0.07 - pos;
+    const xb = xf - 0.168;
     const stockOutline: V2[] = [
-      [x0, 0.016],
-      [x0, -0.012],
-      [x0 - 0.022, -0.017],
-      [x0 - 0.11, -0.043],
-      [x0 - 0.155, -0.058],
-      [x0 - 0.17, -0.058],
-      [x0 - 0.173, -0.05],
-      [x0 - 0.173, 0.021],
-      [x0 - 0.16, 0.024],
-      [x0 - 0.035, 0.024],
+      [xf, 0.0195],
+      [xf - 0.003, -0.004],
+      [xf - 0.016, -0.0125],
+      [xb + 0.03, -0.062],
+      [xb + 0.008, -0.074],
+      [xb, -0.075],
+      [xb, 0.0215],
+      [xb + 0.01, 0.0245],
+      [xf - 0.025, 0.0245],
     ];
-    const cut: V2[] = [[x0 - 0.05, -0.006], [x0 - 0.135, -0.03], [x0 - 0.15, -0.035], [x0 - 0.152, 0.009], [x0 - 0.055, 0.01]];
-    add('Coronha', 'polymer', side(stockOutline, -0.022, 0.022, 0.004, [cut], 3));
-    add('Soleira de borracha', 'grip', side(B.roundedRect(0.008, 0.088, 0.003, 3, x0 - 0.178, -0.016), -0.0225, 0.0225, 0.0028, [], 2));
-    add('Trava da coronha', 'polymer', side([[x0 - 0.01, -0.012], [x0 - 0.06, -0.022], [x0 - 0.062, -0.027], [x0 - 0.012, -0.018]], -0.005, 0.005, 0.0012));
+    const cut: V2[] = [[xf - 0.035, -0.012], [xb + 0.045, -0.05], [xb + 0.045, -0.022], [xf - 0.04, -0.006]];
+    const sling = B.roundedRect(0.022, 0.006, 0.003, 3, xb + 0.02, -0.05);
+    add('Coronha', 'polymer', side(stockOutline, -0.0185, 0.0185, 0.0035, [cut, sling], 3));
+    add('Soleira de borracha', 'grip', side(B.roundedRect(0.009, 0.1, 0.004, 3, xb - 0.0045, -0.0265), -0.0205, 0.0205, 0.0035, [], 2));
+    add('Trava da coronha', 'polymer', side([[xf - 0.006, -0.009], [xf - 0.05, -0.016], [xf - 0.052, -0.021], [xf - 0.008, -0.0145]], -0.005, 0.005, 0.0012));
   }
 
   // ------------------------------------------------------------------ handguard (free float M-LOK)
@@ -169,7 +173,7 @@ export function buildAR15(p: Params): WeaponPart[] {
   };
   const magTop = -0.03;
   const magLen = n(p, 'magLen');
-  const curve = 0.035 * (magLen / 0.17);
+  const curve = 0.05 * (magLen / 0.17);
   for (let i = 0; i <= 10; i++) {
     const t = i / 10;
     const y = magTop - t * magLen;

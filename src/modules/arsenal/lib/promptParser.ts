@@ -50,10 +50,12 @@ const TYPE_RULES: [string, string[]][] = [
   ['plasma-rifle', ['rifle de plasma', 'fuzil de plasma', 'plasma rifle', 'plasma']],
   ['laser-pistol', ['pistola laser', 'blaster', 'laser pistol', 'pistola de raios']],
   ['magic-staff', ['cajado', 'staff', 'bastao magico']],
-  ['sniper', ['rifle de precisao', 'sniper', 'atirador', 'ferrolho', 'bolt action', 'precisao']],
-  ['smg', ['submetralhadora', 'smg', 'mp5', 'uzi', 'pdw']],
-  ['shotgun', ['espingarda', 'escopeta', 'shotgun', 'pump', 'calibre 12', 'cal 12', 'cal. 12']],
-  ['assault-rifle', ['ak', 'ak-47', 'ak47', 'kalashnikov', 'fuzil simples', 'low poly']],
+  ['sniper-hd', ['rifle de precisao', 'sniper', 'atirador', 'ferrolho', 'bolt action', 'precisao', 'm24', 'awp']],
+  ['smg-hd', ['submetralhadora', 'smg', 'mp5', 'pdw']],
+  ['smg', ['uzi']],
+  ['shotgun-hd', ['espingarda', 'escopeta', 'shotgun', 'pump', 'calibre 12', 'cal 12', 'cal. 12', '870', 'doze']],
+  ['ak-hd', ['ak', 'ak-47', 'ak47', 'akm', 'kalashnikov']],
+  ['assault-rifle', ['fuzil simples', 'low poly']],
   ['ar15-hd', ['fuzil de assalto', 'fuzil', 'rifle de assalto', 'assault rifle', 'ar-15', 'ar15', 'm4', 'm16', 'carabina', 'rifle']],
   ['pistol', ['pistola simples', 'revolver']],
   ['pistol-hd', ['pistola', 'pistol', 'glock', 'handgun', '9mm', 'arma curta']],
@@ -121,17 +123,18 @@ export function parsePrompt(prompt: string, fallbackId = 'assault-rifle'): Promp
   else if (has(t, ...OPTIC_SCOPE)) setChoice(c, 'optic', 'luneta') || setChoice(c, 'scope', 'sim');
   else if (has(t, 'miras mecanicas', 'mira mecanica', 'iron sights', 'massa de mira', 'buis')) setChoice(c, 'optic', 'iron') || setChoice(c, 'optic', 'nenhuma');
   else if (has(t, 'sem mira', 'sem otica')) setChoice(c, 'optic', 'nenhuma');
-  if (has(t, 'supressor', 'silenciador', 'suppressor', 'silencer', 'suprimido')) setChoice(c, 'suppressor', 'sim');
+  if (has(t, 'supressor', 'silenciador', 'suppressor', 'silencer', 'suprimido')) setChoice(c, 'suppressor', 'sim') || setChoice(c, 'muzzle', 'supressor');
   if (has(t, 'lanterna', 'flashlight', 'luz tatica')) setChoice(c, 'light', 'sim');
-  if (has(t, 'bipe', 'bipod')) setChoice(c, 'bipod', 'sim');
+  if (has(t, 'bipe', 'bipod')) setChoice(c, 'bipod', 'aberto') || setChoice(c, 'bipod', 'sim');
   if (has(t, 'empunhadura frontal', 'foregrip', 'grip vertical')) setChoice(c, 'foregrip', 'sim');
   if (has(t, 'pmag', 'carregador de polimero', 'magazine de polimero')) setChoice(c, 'mag', 'polimero');
   else if (has(t, 'tambor', 'drum')) setChoice(c, 'mag', 'tambor');
   else if (has(t, 'carregador curvo', 'banana', 'curvo')) setChoice(c, 'mag', 'curvo');
   else if (has(t, 'carregador reto', 'stanag', 'reto')) setChoice(c, 'mag', 'reto');
   if (has(t, 'telescopica', 'retratil', 'coronha ajustavel', 'coronha m4')) setChoice(c, 'stock', 'telescopica') || setChoice(c, 'stock', 'm4');
-  else if (has(t, 'dobravel', 'rebativel', 'folding')) setChoice(c, 'stock', 'dobravel');
+  else if (has(t, 'dobravel', 'rebativel', 'folding')) setChoice(c, 'stock', 'dobravel') || setChoice(c, 'stock', 'retratil');
   else if (has(t, 'coronha fixa')) setChoice(c, 'stock', 'fixa');
+  if (has(t, 'tatica', 'tatico', 'tactical') && c.w.id === 'shotgun-hd') setChoice(c, 'stock', 'tatica');
   else if (has(t, 'sem coronha', 'pistol grip only')) setChoice(c, 'stock', 'nenhuma');
   if (has(t, 'faixa ventilada', 'vent rib')) setChoice(c, 'rib', 'sim');
   if (has(t, 'freio de boca', 'compensador', 'muzzle brake')) setChoice(c, 'muzzle', 'freio');

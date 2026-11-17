@@ -288,6 +288,10 @@ export function bevelExtrude(outline: V2[], depth: number, bevel: number, holes:
   // Never let bevels of neighbouring loops (outline ↔ hole, hole ↔ hole) cross each other.
   const loops0 = [outline, ...holes];
   for (let i = 0; i < loops0.length; i++) for (let j = i + 1; j < loops0.length; j++) b = Math.min(b, loopGap(loops0[i], loops0[j]) * 0.4);
+  // …nor collapse a thin outline: at most 30 % of its smaller extent
+  const xs = outline.map((q) => q[0]);
+  const ys = outline.map((q) => q[1]);
+  b = Math.min(b, Math.min(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys)) * 0.3);
   if (b < 1e-6) return extrude(outline, depth, holes);
   const ccw = (pts: V2[]) => (signedArea2(pts) < 0 ? [...pts].reverse() : pts);
   const outer = ccw(outline);
@@ -366,7 +370,8 @@ export function latheLoop(profile: V2[], segments = 24): P.PolyMesh {
 
 /** Rounded-rectangle outline (2D), handy for slots, buttons and plates. */
 export function roundedRect(w: number, h: number, r: number, steps = 4, cx = 0, cy = 0): V2[] {
-  const rr = Math.min(r, w / 2 - 1e-6, h / 2 - 1e-6);
+  // keep a straight segment between corner arcs (no duplicate points when r ≈ half the size)
+  const rr = Math.min(r, w * 0.49, h * 0.49);
   const pts: V2[] = [];
   const corners: [number, number, number][] = [
     [w / 2 - rr, h / 2 - rr, 0],

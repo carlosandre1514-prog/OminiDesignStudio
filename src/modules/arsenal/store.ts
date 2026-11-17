@@ -64,6 +64,7 @@ export interface ArsenalState {
 
 const frame = () => new Promise<void>((r) => (typeof requestAnimationFrame === 'function' ? requestAnimationFrame(() => setTimeout(r, 0)) : setTimeout(r, 0)));
 
+export const WEAPON_IDS = WEAPONS.map((w) => w.id);
 export const weaponById = (id: string): WeaponType => WEAPONS.find((w) => w.id === id) ?? WEAPONS[0];
 
 function partsFor(s: Pick<ArsenalState, 'source' | 'imagePart' | 'weaponId' | 'params' | 'seed'>): Part[] {

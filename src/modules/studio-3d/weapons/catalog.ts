@@ -4,6 +4,8 @@ import * as P from '../mesh/polyMesh';
 import type { Finish } from './textures';
 import { buildAR15 } from './hd/ar15';
 import { buildPistolHD } from './hd/pistol';
+import { buildAK } from './hd/ak';
+import { buildShotgun, buildSMG, buildSniper } from './hd/long';
 
 /** Material slot of a part; the finish chosen by the user decides the actual texture. */
 export type Slot = 'blade' | 'metal' | 'dark' | 'trim' | 'wood' | 'grip' | 'polymer' | 'string' | 'fletch' | 'glow' | 'crystal' | 'anodized' | 'bright' | 'lens' | 'photo';
@@ -778,7 +780,7 @@ const ar15: WeaponType = {
     choice('mag', 'Carregador', [['aluminio', 'Alumínio'], ['polimero', 'Polímero com janela']]),
     choice('stock', 'Coronha', [['m4', 'M4 retrátil'], ['nenhuma', 'Sem coronha']]),
   ],
-  finish: { steel: 'escuro', polymer: 'preto', grip: 'borracha', energy: 'vermelho', wear: 0.15 },
+  finish: { steel: 'escuro', polymer: 'preto', grip: 'borracha', energy: 'vermelho', wear: 0.3 },
   build: (p) => buildAR15(p),
 };
 
@@ -795,11 +797,68 @@ const pistolHD: WeaponType = {
     choice('light', 'Lanterna no trilho', YESNO, 'nao'),
     choice('suppressor', 'Supressor', YESNO, 'nao'),
   ],
-  finish: { steel: 'escuro', polymer: 'preto', grip: 'borracha', energy: 'verde', wear: 0.12 },
+  finish: { steel: 'escuro', polymer: 'preto', grip: 'borracha', energy: 'verde', wear: 0.25 },
   build: (p) => buildPistolHD(p),
 };
 
-export const WEAPONS: WeaponType[] = [ar15, pistolHD, longsword, katana, dagger, axe, spear, warhammer, shield, pistol, assaultRifle, shotgun, sniper, smg, recurveBow, longbow, crossbow, arrow, energySword, plasmaRifle, laserPistol, staff];
+const akHD: WeaponType = {
+  id: 'ak-hd',
+  name: 'Fuzil AK-47 (HD)',
+  category: 'firearm',
+  hd: true,
+  description: 'Alta definição: caixa estampada com rebites, tampa com nervuras, seletor longo, guarda-mãos de madeira, massa de mira com orelhas, carregador banana curvo.',
+  nums: [num('barrel', 'Cano', 0.3, 0.45, 0.415, 0.005), num('magLen', 'Carregador', 0.15, 0.24, 0.205, 0.005)],
+  choices: [
+    choice('furniture', 'Madeira / polímero', [['madeira', 'Madeira'], ['polimero', 'Polímero']]),
+    choice('stock', 'Coronha', [['fixa', 'Fixa'], ['dobravel', 'Rebatível'], ['nenhuma', 'Sem coronha']]),
+    choice('muzzle', 'Bocal', [['slant', 'Compensador inclinado'], ['freio', 'Freio de boca']]),
+    choice('mag', 'Carregador', [['aco', 'Aço'], ['polimero', 'Polímero']]),
+  ],
+  finish: { steel: 'escuro', wood: 'carvalho', polymer: 'preto', grip: 'borracha', energy: 'vermelho', wear: 0.4 },
+  build: (p) => buildAK(p),
+};
+
+const sniperHD: WeaponType = {
+  id: 'sniper-hd',
+  name: 'Rifle de precisão (HD)',
+  category: 'firearm',
+  hd: true,
+  description: 'Alta definição: ação de ferrolho com alavanca de bola, cano pesado, luneta com torres e anéis, coronha tática com elevador de bochecha, bipé.',
+  nums: [num('barrel', 'Cano', 0.5, 0.75, 0.61, 0.01), num('scope', 'Comprimento da luneta', 0.28, 0.4, 0.34, 0.01)],
+  choices: [
+    choice('bipod', 'Bipé', [['aberto', 'Aberto'], ['fechado', 'Fechado'], ['nao', 'Sem bipé']]),
+    choice('muzzle', 'Bocal', [['nenhum', 'Coroa simples'], ['freio', 'Freio de boca'], ['supressor', 'Supressor']]),
+    choice('mag', 'Carregador destacável', YESNO),
+  ],
+  finish: { steel: 'escuro', polymer: 'oliva', grip: 'borracha', energy: 'vermelho', wear: 0.3 },
+  build: (p) => buildSniper(p),
+};
+
+const shotgunHD: WeaponType = {
+  id: 'shotgun-hd',
+  name: 'Espingarda pump (HD)',
+  category: 'firearm',
+  hd: true,
+  description: 'Alta definição: receptor com janela de ejeção e ferrolho, cano calibre 12 com conta, tubo de carregador, telha com anéis, trava e coronha.',
+  nums: [num('barrel', 'Cano', 0.35, 0.7, 0.47, 0.01), num('tube', 'Tubo do carregador', 0.2, 0.5, 0.36, 0.01), num('forend', 'Telha', 0.14, 0.22, 0.18, 0.005)],
+  choices: [choice('stock', 'Coronha', [['madeira', 'Madeira clássica'], ['tatica', 'Tática com empunhadura'], ['polimero', 'Polímero clássica']]), choice('rib', 'Faixa ventilada', YESNO, 'nao')],
+  finish: { steel: 'escuro', wood: 'nogueira', polymer: 'preto', grip: 'borracha', energy: 'vermelho', wear: 0.35 },
+  build: (p) => buildShotgun(p),
+};
+
+const smgHD: WeaponType = {
+  id: 'smg-hd',
+  name: 'Submetralhadora (HD)',
+  category: 'firearm',
+  hd: true,
+  description: 'Alta definição: receptor com nervuras, tubo e alavanca de armar, guarda-mão tropical, mira de tambor, grupo do gatilho de polímero, carregador curvo.',
+  nums: [num('magLen', 'Carregador', 0.14, 0.24, 0.19, 0.005), num('stockPos', 'Extensão da coronha', 0, 0.08, 0.04, 0.005)],
+  choices: [choice('stock', 'Coronha', [['retratil', 'Retrátil'], ['fixa', 'Fixa'], ['nenhuma', 'Sem coronha']])],
+  finish: { steel: 'escuro', polymer: 'preto', grip: 'borracha', energy: 'vermelho', wear: 0.3 },
+  build: (p) => buildSMG(p),
+};
+
+export const WEAPONS: WeaponType[] = [ar15, akHD, pistolHD, sniperHD, shotgunHD, smgHD, longsword, katana, dagger, axe, spear, warhammer, shield, pistol, assaultRifle, shotgun, sniper, smg, recurveBow, longbow, crossbow, arrow, energySword, plasmaRifle, laserPistol, staff];
 
 export function defaultParams(w: WeaponType): Params {
   const p: Params = {};

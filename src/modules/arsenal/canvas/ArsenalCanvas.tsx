@@ -10,10 +10,12 @@ import { exportRoot, WeaponModel } from './WeaponModel';
 function StudioLighting() {
   return (
     <>
-      <ambientLight intensity={0.15} />
-      <directionalLight position={[2.5, 4, 3]} intensity={2.2} castShadow shadow-mapSize={[2048, 2048]} shadow-bias={-0.0004} />
-      <directionalLight position={[-3, 2, -2.5]} intensity={0.9} color="#bcd7ff" />
-      <Environment resolution={256}>
+      <ambientLight intensity={0.3} />
+      {/* key, fill and rim lights: readable shapes like a game weapon inspection screen */}
+      <directionalLight position={[2.5, 4, 3]} intensity={2.8} castShadow shadow-mapSize={[2048, 2048]} shadow-bias={-0.0004} />
+      <directionalLight position={[-3, 1.5, 2.5]} intensity={0.8} color="#ffe6c8" />
+      <directionalLight position={[-2, 3, -3]} intensity={1.8} color="#bcd7ff" />
+      <Environment resolution={256} environmentIntensity={1.25}>
         <color attach="background" args={['#3b404b']} />
         <Lightformer form="rect" intensity={4} position={[0, 5, 3]} scale={[8, 2.5, 1]} />
         <Lightformer form="rect" intensity={2} position={[-6, 1.5, 0]} rotation-y={Math.PI / 2} scale={[5, 3, 1]} />
@@ -46,7 +48,7 @@ function StatsProbe() {
   });
   useEffect(() => {
     gl.toneMapping = THREE.ACESFilmicToneMapping;
-    gl.toneMappingExposure = 1.05;
+    gl.toneMappingExposure = 1.2;
   }, [gl]);
   return null;
 }
@@ -58,7 +60,19 @@ export interface CameraApi {
   zoom(factor: number): void;
   /** Re-frame the whole weapon. */
   frame(): void;
+  /** Re-frame from a preset direction. */
+  view(v: CameraView): void;
 }
+
+export type CameraView = 'persp' | 'side' | 'top' | 'front' | 'left';
+const VIEW_DIRS: Record<CameraView, [number, number, number]> = {
+  persp: [0.55, 0.32, 0.95],
+  side: [0, 0.0001, 1],
+  left: [0, 0.0001, -1],
+  top: [0, 1, 0.0001],
+  front: [1, 0.05, 0.0001],
+};
+let currentView: CameraView = 'persp';
 
 /** Frames the weapon whenever the set of parts changes; exposes orbit/zoom for remote controls. */
 const CameraRig = forwardRef<CameraApi, { autoRotate: boolean }>(function CameraRig({ autoRotate }, ref) {
@@ -75,9 +89,11 @@ const CameraRig = forwardRef<CameraApi, { autoRotate: boolean }>(function Camera
     if (box.isEmpty()) return;
     const sphere = box.getBoundingSphere(new THREE.Sphere());
     // Exact fit: distance at which all 8 box corners are inside the view frustum (long guns fill the screen).
-    const dir = new THREE.Vector3(0.55, 0.32, 0.95).normalize();
+    const dir = new THREE.Vector3(...VIEW_DIRS[currentView]).normalize();
     const fwd = dir.clone().negate();
-    const right = new THREE.Vector3().crossVectors(fwd, new THREE.Vector3(0, 1, 0)).normalize();
+    const upRef = Math.abs(dir.y) > 0.99 ? new THREE.Vector3(0, 0, -1) : new THREE.Vector3(0, 1, 0);
+    camera.up.set(0, 1, 0);
+    const right = new THREE.Vector3().crossVectors(fwd, upRef).normalize();
     const up = new THREE.Vector3().crossVectors(right, fwd);
     const tanV = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
     const tanH = tanV * camera.aspect;
@@ -127,6 +143,10 @@ const CameraRig = forwardRef<CameraApi, { autoRotate: boolean }>(function Camera
       c.update();
     },
     frame,
+    view(v) {
+      currentView = v;
+      frame();
+    },
   }));
 
   return <OrbitControls ref={controls} makeDefault enableDamping dampingFactor={0.08} autoRotate={autoRotate} autoRotateSpeed={0.8} enablePan />;
@@ -143,7 +163,7 @@ export const ArsenalCanvas = forwardRef<CameraApi, { autoRotate: boolean }>(func
       onPointerMissed={() => useArsenal.getState().set({ selected: null })}
       data-testid="arsenal-canvas"
     >
-      <color attach="background" args={['#252a33']} />
+      <color attach="background" args={['#343a45']} />
       <StudioLighting />
       <WeaponModel />
       <ContactShadows position={[0, -0.001, 0]} opacity={0.55} scale={4} blur={2.4} far={1.5} resolution={512} frames={Infinity} />

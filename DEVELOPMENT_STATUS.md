@@ -104,6 +104,12 @@ _Última atualização: 2026-11-14 (Fase 4 — 3D Design Studio)_
 - Acabamentos padrão realistas por arma, desgaste de bordas só em quinas convexas (lascado), texturas de borracha pontilhada. O interpretador de texto usa os modelos HD para “fuzil/AR-15/M4/pistola/9mm”.
 - Texturas do Estúdio aplicáveis por parte da arma no Arsenal, nas exportações e no Estúdio 3D.
 
+### ✅ Arsenal de armas HD (estilo realista de jogo mobile)
+- Seis armas em alta definição com proporções reais: **AR-15**, **AK-47** (caixa estampada com rebites, tampa com nervuras, guarda-mãos de madeira, massa de mira com orelhas, compensador inclinado, carregador banana), **pistola 9mm**, **rifle de precisão** (ferrolho com alavanca de bola, luneta com torres e anéis, elevador de bochecha, bipé aberto/fechado, freio ou supressor), **espingarda pump** (janela com ferrolho, tubo de carregador, telha com anéis, coronha clássica ou tática) e **submetralhadora** (tubo e alavanca de armar, guarda-mão tropical, mira de tambor, coronha retrátil).
+- Visual de jogo mobile: grafite em vez de preto puro, luz principal + preenchimento + recorte, exposição maior, bordas gastas visíveis só nas quinas, pontilhado fino nas empunhaduras, madeira castanho-avermelhada.
+- Vistas 3/4, lateral, topo e frente no Arsenal, e link direto por arma (`/arsenal?arma=ak-hd`).
+- Construtores mais robustos: chanfro limitado automaticamente pela espessura do contorno e cantos de retângulos sem pontos duplicados.
+
 ### ✅ IA no aparelho (sem servidor, sem API)
 - ONNX Runtime Web (WebGPU ou WASM) com modelos abertos baixados uma vez e guardados offline: U²-Netp (recorte, Apache-2.0) e Depth Anything V2 small (profundidade, Apache-2.0).
 - **Arsenal → Foto → 3D (IA)**: a foto vira sólido 3D estanque em tamanho real, com relevo pela profundidade, bordas arredondadas e a própria foto como textura (mais o mapa normal da profundidade). Exporta GLB/GLTF/OBJ e abre no Estúdio 3D com a textura mapeada.

@@ -1,6 +1,7 @@
 import { Download, Gamepad2, Layers, Maximize, Palette, Pause, Play, Sparkles } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
-import { ArsenalCanvas, type CameraApi } from './canvas/ArsenalCanvas';
+import { ArsenalCanvas, type CameraApi, type CameraView } from './canvas/ArsenalCanvas';
+import { useArsenal, WEAPON_IDS } from './store';
 import { ExportBar } from './components/ExportBar';
 import { Header } from './components/Header';
 import { MaterialsPanel, StudioTexturesPanel } from './components/MaterialsPanel';
@@ -94,6 +95,18 @@ function Viewport({ profile }: { profile: DeviceProfile }) {
           <Btn variant="outline" className="bg-black/50" onClick={() => setAutoRotate((v) => !v)} aria-label={autoRotate ? 'Parar rotação' : 'Girar automaticamente'} tabIndex={profile === 'tv' ? -1 : 0}>
             {autoRotate ? <Pause size={16} /> : <Play size={16} />}
           </Btn>
+          {(
+            [
+              ['persp', '3/4'],
+              ['side', 'Lado'],
+              ['top', 'Topo'],
+              ['front', 'Frente'],
+            ] as [CameraView, string][]
+          ).map(([v, label]) => (
+            <Btn key={v} variant="outline" className="bg-black/50" onClick={() => { setAutoRotate(false); cam.current?.view(v); }} aria-label={`Vista ${label}`} tabIndex={profile === 'tv' ? -1 : 0} data-testid={`view-${v}`}>
+              {label}
+            </Btn>
+          ))}
           <Btn variant="outline" className="bg-black/50" onClick={() => cam.current?.frame()} aria-label="Enquadrar arma" tabIndex={profile === 'tv' ? -1 : 0}>
             <Maximize size={16} />
           </Btn>
@@ -174,6 +187,11 @@ export default function ArsenalApp() {
   const { profile, forced, setProfile } = useDeviceProfile();
   const [tab, setTab] = useState<Tab>('gerar');
   const root = useRef<HTMLDivElement>(null);
+  // Deep link: /arsenal?arma=<id> opens that weapon directly (shareable).
+  useEffect(() => {
+    const id = new URLSearchParams(location.search).get('arma');
+    if (id && WEAPON_IDS.includes(id)) useArsenal.getState().setWeapon(id);
+  }, []);
   const onBack = useCallback(() => {
     const a = document.activeElement as HTMLElement | null;
     // Back: from a panel control, return to the tab list; from the tab list, go to the viewport.
