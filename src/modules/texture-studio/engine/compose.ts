@@ -44,15 +44,19 @@ const hexRgb = (h: string): [number, number, number] => {
 };
 
 /** Evaluate a pattern into a Float32 field with its levels/invert applied. */
-export function patternField(ref: PatternRef, size: number): Float32Array {
+export function patternField(ref: PatternRef, size: number, repeat = 1): Float32Array {
   const gen = GEN_BY_ID.get(ref.gen);
   const out = new Float32Array(size * size);
   if (!gen) return out.fill(0.5);
-  const f = gen.prepare(ref.params, size);
+  const rep = Math.max(1, Math.round(repeat));
+  const f = gen.prepare(ref.params, Math.max(64, Math.round(size / rep)));
   const span = ref.high - ref.low || 1e-6;
+  const fr = (x: number) => x - Math.floor(x);
   for (let y = 0; y < size; y++)
     for (let x = 0; x < size; x++) {
-      let v = clamp01((f((x + 0.5) / size, (y + 0.5) / size) - ref.low) / span);
+      const u = (x + 0.5) / size;
+      const w = (y + 0.5) / size;
+      let v = clamp01((f(rep > 1 ? fr(u * rep) : u, rep > 1 ? fr(w * rep) : w) - ref.low) / span);
       if (ref.invert) v = 1 - v;
       out[y * size + x] = v;
     }
@@ -81,6 +85,63 @@ function bitmapSampler(b: Bitmap) {
     }
     return out;
   };
+}
+
+/** Fields baked from a 3D model (see meshBake.ts), resampled to the output size. */
+interface MeshFields {
+  convex: Float32Array;
+  concave: Float32Array;
+  vertex: Float32Array;
+  cover: Uint8Array;
+}
+
+function meshFields(b: Bitmap | undefined, size: number): MeshFields | null {
+  if (!b) return null;
+  const N = size * size;
+  const f: MeshFields = { convex: new Float32Array(N), concave: new Float32Array(N), vertex: new Float32Array(N), cover: new Uint8Array(N) };
+  const sm = bitmapSampler(b);
+  const px = [0, 0, 0, 0];
+  for (let y = 0; y < size; y++)
+    for (let x = 0; x < size; x++) {
+      const i = y * size + x;
+      sm((x + 0.5) / size, (y + 0.5) / size, px);
+      f.convex[i] = px[0];
+      f.concave[i] = px[1];
+      f.vertex[i] = px[3] > 0 ? px[2] / px[3] : 0.5;
+      f.cover[i] = px[3] > 0.5 ? 1 : 0;
+    }
+  return f;
+}
+
+/** Fill texels outside the UV charts with the nearest chart texel (multi-source BFS), for every map. */
+export function dilateMaps(maps: Uint8ClampedArray[], cover: Uint8Array, size: number) {
+  const N = size * size;
+  const src = new Int32Array(N).fill(-1);
+  const queue = new Int32Array(N);
+  let head = 0;
+  let tail = 0;
+  for (let i = 0; i < N; i++)
+    if (cover[i]) {
+      src[i] = i;
+      queue[tail++] = i;
+    }
+  if (!tail || tail === N) return;
+  while (head < tail) {
+    const i = queue[head++];
+    const x = i % size;
+    const y = (i - x) / size;
+    const nb = [x > 0 ? i - 1 : -1, x < size - 1 ? i + 1 : -1, y > 0 ? i - size : -1, y < size - 1 ? i + size : -1];
+    for (const j of nb)
+      if (j >= 0 && src[j] < 0) {
+        src[j] = src[i];
+        queue[tail++] = j;
+      }
+  }
+  for (const m of maps)
+    for (let i = 0; i < N; i++) {
+      const s = src[i];
+      if (s !== i && s >= 0) m.set(m.subarray(s * 4, s * 4 + 4), i * 4);
+    }
 }
 
 /** Separable box blur with wrap-around (repeated for a smoother kernel). */
@@ -133,13 +194,13 @@ function blendChannel(mode: BlendMode, a: number, b: number): number {
 }
 
 /** Mask of a layer (0..1), using the stack evaluated so far for curvature/height masks. */
-function layerMask(layer: Layer, size: number, height: Float32Array, bitmaps: BitmapSet): Float32Array {
+function layerMask(layer: Layer, size: number, height: Float32Array, bitmaps: BitmapSet, mesh: MeshFields | null, rep = 1): Float32Array {
   const m = layer.mask;
   const N = size * size;
   let out: Float32Array;
   switch (m.kind) {
     case 'pattern':
-      out = m.pattern ? patternField(m.pattern, size) : new Float32Array(N).fill(1);
+      out = m.pattern ? patternField(m.pattern, size, rep) : new Float32Array(N).fill(1);
       break;
     case 'paint':
     case 'text':
@@ -167,6 +228,22 @@ function layerMask(layer: Layer, size: number, height: Float32Array, bitmaps: Bi
       for (let i = 0; i < N; i++) {
         const d = height[i] - bl[i];
         out[i] = m.side === 'concave' ? smooth(0, k, -d) : smooth(0, k, d);
+      }
+      if (mesh) {
+        // painting a real model: wear/dirt also follow the geometry (sharp edges + surface convexity)
+        const a = Math.max(0.02, m.amount);
+        for (let i = 0; i < N; i++) {
+          const edge = 1 - smooth(a * 0.45, a, 1 - (m.side === 'concave' ? mesh.concave[i] : mesh.convex[i]));
+          const c = m.side === 'concave' ? 1 - mesh.vertex[i] : mesh.vertex[i];
+          const vert = smooth(0.66 - a * 0.12, 0.86 - a * 0.12, c);
+          // the texture relief only adds a little: on a model the real geometry leads
+          out[i] = Math.max(out[i] * 0.35, edge, vert);
+        }
+      }
+      // optional break-up pattern (chipped paint instead of clean lines)
+      if (m.pattern) {
+        const br = patternField(m.pattern, size, rep);
+        for (let i = 0; i < N; i++) out[i] = clamp01(out[i] * (0.25 + br[i] * 1.5));
       }
       break;
     }
@@ -205,10 +282,13 @@ export function evaluate(doc: TextureDoc, size: number, bitmaps: BitmapSet = {},
   const emis = new Float32Array(N * 3);
   const layers = doc.layers.filter((l) => l.visible && l.opacity > 0);
   const px = [0, 0, 0, 0];
+  const mesh = meshFields(bitmaps['mesh:curv'], size);
+  // on a model the atlas spans the whole object: patterns repeat to keep a real-world scale
+  const rep = mesh ? doc.modelScale ?? 1 : 1;
 
   layers.forEach((layer, li) => {
     const c = layer.content;
-    let val = c.pattern ? patternField(c.pattern, size) : null;
+    let val = c.pattern ? patternField(c.pattern, size, rep) : null;
     const hImg = c.heightImageId ? bitmaps[`height:${layer.id}`] : undefined;
     if (hImg) {
       // grayscale height image (e.g. AI depth of a photographed surface) replaces the pattern value
@@ -220,7 +300,7 @@ export function evaluate(doc: TextureDoc, size: number, bitmaps: BitmapSet = {},
           val[y * size + x] = (px[0] + px[1] + px[2]) / 3;
         }
     }
-    const mask = layerMask(layer, size, height, bitmaps);
+    const mask = layerMask(layer, size, height, bitmaps, mesh, rep);
     const stops = c.colors.map(hexRgb);
     const img = c.imageId ? bitmaps[`color:${layer.id}`] : undefined;
     const imgS = img ? bitmapSampler(img) : null;
@@ -315,7 +395,9 @@ export function evaluate(doc: TextureDoc, size: number, bitmaps: BitmapSet = {},
       metallic[o] = metallic[o + 1] = metallic[o + 2] = m;
       heightMap[o] = heightMap[o + 1] = heightMap[o + 2] = h;
       const cav = Math.max(0, b1[i] - height[i]) * 6 + Math.max(0, b2[i] - height[i]) * 3;
-      const a = clamp01(1 - cav * doc.aoStrength * 4) * 255;
+      // on a model, inner corners and concave areas of the geometry darken too
+      const geo = mesh ? mesh.concave[i] * 0.45 + Math.max(0, 0.5 - mesh.vertex[i]) * 0.6 : 0;
+      const a = clamp01(1 - cav * doc.aoStrength * 4 - geo * doc.aoStrength) * 255;
       ao[o] = ao[o + 1] = ao[o + 2] = a;
       orm[o] = a;
       orm[o + 1] = r;
@@ -329,6 +411,7 @@ export function evaluate(doc: TextureDoc, size: number, bitmaps: BitmapSet = {},
       normal[o + 2] = (1 / l * 0.5 + 0.5) * 255;
       for (const arr of [baseColor, roughness, metallic, heightMap, normal, ao, emissive, orm]) arr[o + 3] = 255;
     }
+  if (mesh) dilateMaps([baseColor, roughness, metallic, heightMap, normal, ao, emissive, orm], mesh.cover, size);
   onProgress?.(1);
   return { size, baseColor, roughness, metallic, normal, height: heightMap, ao, emissive, orm };
 }

@@ -7,17 +7,13 @@ import { debounce, type Debounced } from '@/core/utils/debounce';
 import { toast } from '@/ui/toast';
 import { createLayer, createTextureDoc, normalizeTextureDoc, type Layer, type TextureDoc } from './engine/types';
 import type { TextureMaps } from './engine/compose';
+import { DEFAULT_BRUSH, type BrushSettings } from './engine/paint3d';
 
 export const MODULE_ID = 'texture-studio';
 export type SaveStatus = 'idle' | 'dirty' | 'saving' | 'saved' | 'error';
 export type MapView = 'baseColor' | 'roughness' | 'metallic' | 'normal' | 'height' | 'ao' | 'emissive';
 
-export interface Brush {
-  size: number; // fraction of texture width
-  hardness: number;
-  opacity: number;
-  erase: boolean;
-}
+export type Brush = BrushSettings;
 
 interface State {
   projectId: string | null;
@@ -37,7 +33,7 @@ interface State {
   evaluating: boolean;
   /** Bumped while painting so the preview re-evaluates from the live canvas. */
   paintTick: number;
-  previewSize: 256 | 512;
+  previewSize: 256 | 512 | 1024;
   /** Paint mode (brush active on the 2D/3D views when the selected layer has a paint mask). */
   painting: boolean;
 
@@ -93,7 +89,7 @@ export const useTextures = create<State>((set, get) => {
     view: '3d',
     mapView: 'baseColor',
     tile2d: false,
-    brush: { size: 0.05, hardness: 0.6, opacity: 1, erase: false },
+    brush: { ...DEFAULT_BRUSH },
     saveStatus: 'idle',
     preview: null,
     evaluating: false,

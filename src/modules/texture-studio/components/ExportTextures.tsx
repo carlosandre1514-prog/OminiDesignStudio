@@ -6,7 +6,9 @@ import { slugify } from '@/core/utils/sanitize';
 import { Modal } from '@/ui/Modal';
 import { toast } from '@/ui/toast';
 import { MAP_LABELS, type TextureMaps } from '../engine/compose';
+import { GODOT_README, godotMaterialTres } from '../engine/godot';
 import { render } from '../engine/runner';
+import { targetGlb } from '../engine/target';
 import { selectDoc, useTextures } from '../store';
 
 type MapKey = Exclude<keyof TextureMaps, 'size'>;
@@ -61,6 +63,37 @@ export function ExportTextures({ onClose }: { onClose: () => void }) {
     }
   };
 
+  /** Godot 4 package: textures + StandardMaterial3D (.tres) + the painted model (.glb) when there is one. */
+  const godot = async () => {
+    try {
+      setProgress(0);
+      // Godot reads OpenGL-style normal maps
+      const out = await render({ ...doc, normalFormat: 'opengl' }, size, (p) => setProgress(p * 0.7));
+      const folder = base.replace(/-/g, '_');
+      const z = new JSZip();
+      const dir = z.folder(folder)!;
+      const hasEmission = out.emissive.some((v, i) => i % 4 !== 3 && v > 0);
+      const files = { albedo: `${folder}_albedo.png`, normal: `${folder}_normal.png`, roughness: `${folder}_roughness.png`, metallic: `${folder}_metallic.png`, ao: `${folder}_ao.png`, height: `${folder}_height.png`, ...(hasEmission ? { emission: `${folder}_emission.png` } : {}) };
+      const data: [string, Uint8ClampedArray][] = [[files.albedo, out.baseColor], [files.normal, out.normal], [files.roughness, out.roughness], [files.metallic, out.metallic], [files.ao, out.ao], [files.height, out.height]];
+      if (hasEmission) data.push([`${folder}_emission.png`, out.emissive]);
+      for (let i = 0; i < data.length; i++) {
+        dir.file(data[i][0], await encodePng(data[i][1], out.size));
+        setProgress(0.7 + (0.2 * (i + 1)) / data.length);
+      }
+      dir.file(`${folder}.tres`, godotMaterialTres({ name: doc.name, folder, files, skin: doc.surface === 'skin', normalStrength: 1 }));
+      const withModel = !!doc.target && doc.previewShape === 'model';
+      if (withModel) dir.file(`${folder}.glb`, await targetGlb(doc.target!, out, doc.name));
+      dir.file('LEIA-ME.txt', GODOT_README(folder, withModel));
+      downloadBlob(await z.generateAsync({ type: 'blob' }), `${base}-godot4.zip`);
+      toast.success(withModel ? 'Pacote Godot 4 exportado (modelo .glb + material .tres + texturas)' : 'Pacote Godot 4 exportado (material .tres + texturas)');
+      onClose();
+    } catch (e) {
+      toast.error(`Falha ao exportar: ${e instanceof Error ? e.message : e}`);
+    } finally {
+      setProgress(null);
+    }
+  };
+
   const library = async () => {
     try {
       const files = await build();
@@ -89,6 +122,7 @@ export function ExportTextures({ onClose }: { onClose: () => void }) {
         <>
           <button className="btn-ghost" onClick={onClose} disabled={busy}>Cancelar</button>
           <button className="btn-outline" onClick={library} disabled={busy || !maps.size} data-testid="tex-save-library">Salvar na biblioteca</button>
+          <button className="btn-outline" onClick={godot} disabled={busy} data-testid="tex-export-godot">Godot 4</button>
           <button className="btn-primary" onClick={zip} disabled={busy || !maps.size} data-testid="tex-download-zip">Baixar ZIP</button>
         </>
       }

@@ -3,7 +3,8 @@ import { createId } from '@/core/utils/id';
 import type { PolyMesh, Vec3 } from './mesh/polyMesh';
 
 export type Primitive = 'box' | 'sphere' | 'cylinder' | 'cone' | 'plane' | 'torus';
-export type UVProjection = 'box' | 'planarXY' | 'planarXZ' | 'planarYZ' | 'spherical' | 'cylindrical';
+/** 'atlas' = unique, non-overlapping UVs for 3D painting (stored per face in the mesh, or generated). */
+export type UVProjection = 'box' | 'planarXY' | 'planarXZ' | 'planarYZ' | 'spherical' | 'cylindrical' | 'atlas';
 export type ObjType = 'mesh' | 'group' | 'light' | 'model';
 export type LightKind = 'directional' | 'point' | 'spot' | 'area' | 'hemisphere';
 
@@ -295,7 +296,7 @@ const isVec3 = (v: unknown): v is Vec3 => Array.isArray(v) && v.length === 3 && 
 const num = (v: unknown, d: number, min = -Infinity, max = Infinity) => (typeof v === 'number' && Number.isFinite(v) ? Math.min(max, Math.max(min, v)) : d);
 const color = (v: unknown, d: string) => (typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v) ? v : d);
 const PRIMS = Object.keys(PRIMITIVE_LABELS) as Primitive[];
-const UVS: UVProjection[] = ['box', 'planarXY', 'planarXZ', 'planarYZ', 'spherical', 'cylindrical'];
+const UVS: UVProjection[] = ['box', 'planarXY', 'planarXZ', 'planarYZ', 'spherical', 'cylindrical', 'atlas'];
 
 function validMesh(m: unknown): m is { v: number[]; f: number[][] } {
   if (!m || typeof m !== 'object') return false;

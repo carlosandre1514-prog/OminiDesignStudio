@@ -117,6 +117,15 @@ _Última atualização: 2026-11-14 (Fase 4 — 3D Design Studio)_
 - **AR-15 configurado como a referência** (carabina com guarda-mão de polímero M-LOK arredondado, massa de mira A2, cano de 16", PMAG texturizado, alça traseira levantada, guarda-mato grande); a versão free-float de alumínio continua disponível.
 - Texturas de perto mais limpas: pontilhado de borracha sem "chuvisco" preto e branco, riscos de desgaste só na cor/rugosidade (sem vincos no relevo) e sujeira com menos manchas de brilho.
 
+### ✅ Pintura 3D (texturização direto no modelo, estilo Substance)
+- **Estúdio 3D → 🖌 Pintar em 3D**: abre o Estúdio de Texturas com o objeto selecionado (ou a cena, sem o chão). Inclui armas vindas do Arsenal e modelos importados (convertidos em malha).
+- **UV atlas automática** sem sobreposição e **leitura da malha**: quinas vivas, cantos internos e curvatura.
+- **Pincel 3D** que atravessa as emendas da UV, com formatos redondo, quadrado, spray, grunge e pontilhado, além de tamanho, dureza, opacidade, fluxo, espaçamento, borracha e cor.
+- **Desgaste automático pela geometria real** (quinas gastas, poeira nos cantos, AO), com opção de quebrar em lascas.
+- Materiais de **pele humana** (poros, microrrugas, sardas, vermelhidão, cicatrizes/oleosidade para pintar, translucidez SSS) e de **animais** (escamas, crocodilo, peixe/cobra, tigre, onça, lobo, penas, chifre/casco). São 9 geradores orgânicos novos.
+- **Aplicar no modelo**: grava material e UV no projeto 3D.
+- **Exportar → Godot 4**: texturas, `StandardMaterial3D` (`.tres`) e o modelo `.glb` pintado. Detalhes em `docs/PINTURA3D.md`.
+
 ### ✅ IA no aparelho (sem servidor, sem API)
 - ONNX Runtime Web (WebGPU ou WASM) com modelos abertos baixados uma vez e guardados offline: U²-Netp (recorte, Apache-2.0) e Depth Anything V2 small (profundidade, Apache-2.0).
 - **Arsenal → Foto → 3D (IA)**: a foto vira sólido 3D estanque em tamanho real, com relevo pela profundidade, bordas arredondadas e a própria foto como textura (mais o mapa normal da profundidade). Exporta GLB/GLTF/OBJ e abre no Estúdio 3D com a textura mapeada.

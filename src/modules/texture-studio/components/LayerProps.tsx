@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { AssetPicker } from '@/modules/asset-library/AssetPicker';
 import { GENERATORS, GEN_BY_ID, defaultGenParams } from '../engine/generators';
+import { BRUSH_SHAPES, type BrushShape } from '../engine/paint3d';
 import { paintCanvas, PAINT_RES, syncPaintSource } from '../engine/runner';
 import { BLEND_LABELS, HEIGHT_LABELS, MASK_LABELS, pattern, type BlendMode, type HeightMode, type Layer, type LayerContent, type LayerMask, type MaskKind, type PatternRef, type TextMask } from '../engine/types';
 import { selectDoc, useTextures } from '../store';
 import { Check, Group, Num, Select } from './controls';
 
-const GEN_OPTIONS = (['Ruídos', 'Superfícies', 'Desgaste', 'Geométricos', 'Industriais'] as const).map((group) => ({
+const GEN_OPTIONS = (['Ruídos', 'Superfícies', 'Desgaste', 'Geométricos', 'Industriais', 'Orgânicos'] as const).map((group) => ({
   group,
   items: GENERATORS.filter((g) => g.group === group).map((g) => [g.id, g.label] as [string, string]),
 }));
@@ -71,9 +72,28 @@ function BrushTools({ layer }: { layer: Layer }) {
           {painting ? 'Pausar (girar câmera)' : 'Retomar pintura'}
         </button>
       </div>
+      <div className="flex flex-wrap gap-1" role="group" aria-label="Formato do pincel">
+        {(Object.keys(BRUSH_SHAPES) as BrushShape[]).map((k) => (
+          <button key={k} className={`rounded px-2 py-1 text-[11px] ${brush.shape === k ? 'bg-amber-500 text-black' : 'bg-ink-800 text-ink-200'}`} onClick={() => setBrush({ shape: k })}>
+            {BRUSH_SHAPES[k]}
+          </button>
+        ))}
+      </div>
+      <label className="flex items-center justify-between gap-2 text-[11px] text-ink-300">
+        Cor da tinta
+        <input
+          type="color"
+          aria-label="Cor da tinta"
+          className="h-6 w-12 cursor-pointer rounded border border-ink-700 bg-transparent"
+          value={layer.content.colors[0] ?? '#c0392b'}
+          onChange={(e) => st().updateLayer(layer.id, (l) => ({ ...l, content: { ...l.content, colors: [e.target.value], pattern: null } }))}
+        />
+      </label>
       <Num label="Tamanho" value={brush.size} min={0.005} max={0.4} step={0.005} format={(v) => `${Math.round(v * 100)}%`} onLive={(v) => setBrush({ size: v })} />
       <Num label="Dureza" value={brush.hardness} min={0} max={1} step={0.05} onLive={(v) => setBrush({ hardness: v })} />
       <Num label="Opacidade do pincel" value={brush.opacity} min={0.05} max={1} step={0.05} onLive={(v) => setBrush({ opacity: v })} />
+      <Num label="Fluxo (acúmulo por toque)" value={brush.flow} min={0.05} max={1} step={0.05} onLive={(v) => setBrush({ flow: v })} />
+      <Num label="Espaçamento" value={brush.spacing} min={0.05} max={1.5} step={0.05} onLive={(v) => setBrush({ spacing: v })} />
       <div className="flex gap-1">
         <button className="btn-ghost px-2 py-1 text-[11px]" onClick={() => fill(true)}>Preencher tudo</button>
         <button className="btn-ghost px-2 py-1 text-[11px]" onClick={() => fill(false)}>Limpar</button>
@@ -210,7 +230,14 @@ export function LayerProps() {
               onChange={(v) => mask({ side: v as LayerMask['side'] })}
             />
             <Num label="Quantidade" value={m.amount} min={0} max={1} step={0.01} onLive={(v) => mask({ amount: v }, true)} />
-            <p className="text-[10px] text-ink-400">Calculada a partir do relevo das camadas abaixo.</p>
+            {m.kind === 'curvature' && (
+              <Check
+                label="Quebrar em lascas (desgaste irregular)"
+                checked={!!m.pattern}
+                onChange={(v) => mask({ pattern: v ? pattern('grunge', { scale: 6, coverage: 0.5, sharpness: 3, seed: 7 }) : null })}
+              />
+            )}
+            <p className="text-[10px] text-ink-400">{doc.previewShape === 'model' && doc.target ? 'Calculada pela geometria real do modelo (quinas e cantos) e pelo relevo das camadas abaixo.' : 'Calculada a partir do relevo das camadas abaixo.'}</p>
           </>
         )}
         {m.kind !== 'none' && <Check label="Inverter máscara" checked={m.invert} onChange={(v) => mask({ invert: v })} />}
@@ -241,11 +268,21 @@ export function DocSettings() {
     <Group title="Configurações da textura">
       <Num label="Força da normal" value={doc.normalStrength} min={0} max={4} step={0.05} onLive={(v) => st().live((d) => ({ ...d, normalStrength: v }))} />
       <Num label="Força da oclusão (AO)" value={doc.aoStrength} min={0} max={2} step={0.05} onLive={(v) => st().live((d) => ({ ...d, aoStrength: v }))} />
-      <Num label="Repetição na prévia" value={doc.previewTiling} min={1} max={8} step={1} onLive={(v) => st().live((d) => ({ ...d, previewTiling: v }))} />
+      {doc.target && doc.previewShape === 'model' ? (
+        <Num label="Escala dos padrões no modelo (repetições)" value={doc.modelScale ?? 1} min={1} max={32} step={1} onLive={(v) => st().live((d) => ({ ...d, modelScale: v }))} />
+      ) : (
+        <Num label="Repetição na prévia" value={doc.previewTiling} min={1} max={8} step={1} onLive={(v) => st().live((d) => ({ ...d, previewTiling: v }))} />
+      )}
       <div className="grid grid-cols-2 gap-2">
         <Select label="Normal" value={doc.normalFormat} options={[['opengl', 'OpenGL (Y+)'], ['directx', 'DirectX (Y−)']]} onChange={(v) => st().apply((d) => ({ ...d, normalFormat: v }))} />
-        <Select label="Qualidade da prévia" value={String(previewSize)} options={[['256', '256 px (rápida)'], ['512', '512 px']]} onChange={(v) => st().set({ previewSize: Number(v) as 256 | 512 })} />
+        <Select label="Qualidade da prévia" value={String(previewSize)} options={[['256', '256 px (rápida)'], ['512', '512 px'], ['1024', '1024 px (modelo)']]} onChange={(v) => st().set({ previewSize: Number(v) as 256 | 512 | 1024 })} />
       </div>
+      <Select
+        label="Tipo de superfície"
+        value={doc.surface ?? 'standard'}
+        options={[['standard', 'Padrão (PBR)'], ['skin', 'Pele (translucidez / SSS)']]}
+        onChange={(v) => st().apply((d) => ({ ...d, surface: v }))}
+      />
     </Group>
   );
 }

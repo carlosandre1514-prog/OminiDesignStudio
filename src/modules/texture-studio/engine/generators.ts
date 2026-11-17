@@ -24,7 +24,7 @@ export type Params = Record<string, number | string>;
 export interface GeneratorDef {
   id: string;
   label: string;
-  group: 'Ruídos' | 'Superfícies' | 'Desgaste' | 'Geométricos' | 'Industriais';
+  group: 'Ruídos' | 'Superfícies' | 'Desgaste' | 'Geométricos' | 'Industriais' | 'Orgânicos';
   nums: NumDef[];
   choices?: ChoiceDef[];
   /** Build a sampler for a given output resolution (some generators rasterise first). */
@@ -376,6 +376,178 @@ export const GENERATORS: GeneratorDef[] = [
       const x = frac(u * c + (row % 2) * 0.5) - 0.5;
       const y = frac(v * c) - 0.5;
       return smooth(n(p, 'radius') - 0.03, n(p, 'radius') + 0.03, Math.hypot(x, y));
+    },
+  },
+  // ------------------------------------------------------------ organic: skin & animals
+  {
+    id: 'skin-pores',
+    label: 'Pele (poros e microrrugas)',
+    group: 'Orgânicos',
+    nums: [N('scale', 'Poros', 40, 240, 120), N('depth', 'Profundidade dos poros', 0, 1, 0.6, 0.05), N('wrinkles', 'Microrrugas', 0, 1, 0.45, 0.05), SEED],
+    prepare: (p) => (u, v) => {
+      const sd = n(p, 'seed');
+      const w = worley(u, v, Math.round(n(p, 'scale')), sd, 0.9);
+      // pores: small round dimples of varying size
+      const r = 0.12 + w.id * 0.16;
+      const pore = 1 - smooth(r * 0.4, r, w.f1);
+      // micro wrinkles: two crossing ridged directional noises
+      const a = 1 - Math.abs(fbm(u, v, 24, 3, 0.5, sd + 5, 4, 1) * 2 - 1);
+      const b = 1 - Math.abs(fbm(u, v, 24, 3, 0.5, sd + 9, 1, 4) * 2 - 1);
+      const lines = Math.max(smooth(0.86, 1, a), smooth(0.86, 1, b));
+      const base = 0.62 + (fbm(u, v, 6, 4, 0.5, sd + 2) - 0.5) * 0.3;
+      return clamp01(base - pore * n(p, 'depth') * 0.45 - lines * n(p, 'wrinkles') * 0.25);
+    },
+  },
+  {
+    id: 'freckles',
+    label: 'Sardas / pintas',
+    group: 'Orgânicos',
+    nums: [N('scale', 'Tamanho (inverso)', 8, 120, 48), N('density', 'Densidade', 0, 1, 0.35, 0.05), N('cluster', 'Agrupamento', 0, 1, 0.6, 0.05), SEED],
+    prepare: (p) => (u, v) => {
+      const sd = n(p, 'seed');
+      const w = worley(u, v, Math.round(n(p, 'scale')), sd, 1);
+      // freckles gather in patches (cheeks, shoulders)
+      const patch = smooth(0.35, 0.75, fbm(u, v, 3, 3, 0.5, sd + 3)) * n(p, 'cluster') + (1 - n(p, 'cluster'));
+      const on = w.id < n(p, 'density') * patch ? 1 : 0;
+      const r = 0.12 + hash2(Math.floor(w.id * 9973), 3, sd) * 0.2;
+      return on * (1 - smooth(r * 0.5, r, w.f1)) * (0.6 + w.id * 0.4 / Math.max(0.05, n(p, 'density')) * 0.4);
+    },
+  },
+  {
+    id: 'wrinkles',
+    label: 'Rugas / dobras',
+    group: 'Orgânicos',
+    nums: [N('scale', 'Escala', 2, 24, 6), N('stretch', 'Direção (estiramento)', 1, 8, 3), N('sharpness', 'Nitidez', 1, 8, 3, 0.5), SEED],
+    prepare: (p) => (u, v) => {
+      const r = 1 - Math.abs(fbm(u, v, n(p, 'scale'), 5, 0.5, n(p, 'seed'), 1, n(p, 'stretch')) * 2 - 1);
+      return clamp01(Math.pow(r, n(p, 'sharpness')));
+    },
+  },
+  {
+    id: 'scales',
+    label: 'Escamas',
+    group: 'Orgânicos',
+    nums: [N('scale', 'Escamas', 4, 64, 16), N('bevel', 'Arredondamento', 0.05, 0.6, 0.3, 0.05), N('irregular', 'Irregularidade', 0, 1, 0.35, 0.05), SEED],
+    choices: [{ key: 'kind', label: 'Tipo', options: [['reptile', 'Réptil / crocodilo (placas)'], ['fish', 'Peixe / cobra (sobrepostas)']], value: 'reptile' }],
+    prepare: (p) => (u, v) => {
+      const sd = n(p, 'seed');
+      const sc = Math.max(2, Math.round(n(p, 'scale') / 2) * 2);
+      if (p.kind === 'fish') {
+        // overlapping round scales: rows hang over the next one (like roof tiles)
+        const x = u * sc;
+        const y = v * sc;
+        let best = -1;
+        let val = 0;
+        for (let r = Math.floor(y) - 1; r <= Math.floor(y) + 1; r++) {
+          const off = (((r % 2) + 2) % 2) * 0.5;
+          for (let c = Math.floor(x - off) - 1; c <= Math.floor(x - off) + 1; c++) {
+            const cx = c + 0.5 + off;
+            const cy = r;
+            const d = Math.hypot(x - cx, (y - cy) * 1.1);
+            if (d < 0.72 && r > best) {
+              best = r;
+              const t = d / 0.72;
+              val = 1 - t * t * (0.6 + n(p, 'bevel')) + (hash2(((c % sc) + sc) % sc, ((r % sc) + sc) % sc, sd) - 0.5) * n(p, 'irregular') * 0.3;
+            }
+          }
+        }
+        return clamp01(val);
+      }
+      const w = worley(u, v, sc, sd, 0.15 + n(p, 'irregular') * 0.7);
+      const plate = smooth(0, n(p, 'bevel'), w.f2 - w.f1);
+      return clamp01(plate * (0.75 + w.id * 0.25) + (fbm(u, v, sc * 2, 2, 0.5, sd + 4) - 0.5) * 0.15);
+    },
+  },
+  {
+    id: 'fur',
+    label: 'Pelos',
+    group: 'Orgânicos',
+    nums: [N('density', 'Densidade', 8, 96, 40), N('length', 'Comprimento', 2, 16, 8), N('flow', 'Ondulação', 0, 1, 0.35, 0.05), N('clumps', 'Tufos', 0, 1, 0.5, 0.05), SEED],
+    prepare: (p) => (u, v) => {
+      const sd = n(p, 'seed');
+      // strands: fine noise stretched along v, combed by a slow warp
+      const warp = (fbm(u, v, 2, 3, 0.5, sd + 1) - 0.5) * n(p, 'flow') * 0.15;
+      const den = Math.max(1, Math.round(n(p, 'density')));
+      const len = Math.max(1, Math.round(den / n(p, 'length')));
+      const s1 = valueNoise(u + warp, v, den * 4, len, sd);
+      const s2 = valueNoise(u + warp * 1.3, v, den * 8, len * 2, sd + 7);
+      const strands = clamp01((s1 * 0.6 + s2 * 0.4 - 0.25) * 1.8);
+      const clump = 1 - n(p, 'clumps') * 0.6 * smooth(0.4, 0.75, worley(u + warp, v, Math.max(2, Math.round(den / 6)), sd + 3, 1).f1);
+      return clamp01(strands * clump);
+    },
+  },
+  {
+    id: 'animal-stripes',
+    label: 'Listras animais (tigre/zebra)',
+    group: 'Orgânicos',
+    nums: [N('count', 'Listras', 2, 24, 8), N('warp', 'Distorção', 0, 3, 1.2, 0.1), N('thickness', 'Espessura', 0.1, 0.9, 0.4, 0.05), N('breakup', 'Quebras', 0, 1, 0.5, 0.05), SEED],
+    prepare: (p) => (u, v) => {
+      const sd = n(p, 'seed');
+      const w = (fbm(u, v, 3, 4, 0.5, sd) - 0.5) * n(p, 'warp');
+      const s = 0.5 + 0.5 * Math.sin((u * Math.round(n(p, 'count')) + w) * Math.PI * 2);
+      const br = fbm(u, v, 6, 3, 0.5, sd + 5);
+      const t = n(p, 'thickness') + (br - 0.5) * n(p, 'breakup');
+      return smooth(1 - t - 0.05, 1 - t + 0.05, s);
+    },
+  },
+  {
+    id: 'rosettes',
+    label: 'Rosetas (onça/leopardo)',
+    group: 'Orgânicos',
+    nums: [N('scale', 'Rosetas', 3, 24, 9), N('ring', 'Anel', 0.05, 0.4, 0.16, 0.01), N('breakup', 'Quebras', 0, 1, 0.55, 0.05), SEED],
+    prepare: (p) => (u, v) => {
+      const sd = n(p, 'seed');
+      const w = worley(u, v, Math.round(n(p, 'scale')), sd, 0.8);
+      const r0 = 0.28 + w.id * 0.1;
+      const band = smooth(r0 - n(p, 'ring'), r0 - n(p, 'ring') * 0.5, w.f1) * (1 - smooth(r0, r0 + 0.05, w.f1));
+      const br = smooth(0.5 - n(p, 'breakup') * 0.3, 0.6, fbm(u, v, Math.round(n(p, 'scale')) * 3, 3, 0.5, sd + 2));
+      const spot = (1 - smooth(0.08, 0.13, worley(u, v, Math.round(n(p, 'scale')) * 2, sd + 9, 1).f1)) * (w.f1 > r0 + 0.05 ? 1 : 0);
+      return clamp01(band * br + spot);
+    },
+  },
+  {
+    id: 'feathers',
+    label: 'Penas',
+    group: 'Orgânicos',
+    nums: [N('scale', 'Penas', 2, 16, 6), N('barbs', 'Barbas', 10, 80, 36), SEED],
+    prepare: (p) => (u, v) => {
+      const sd = n(p, 'seed');
+      const sc = Math.max(2, Math.round(n(p, 'scale') / 2) * 2);
+      const x = u * sc;
+      const y = v * sc;
+      let val = 0.12;
+      let best = -1;
+      // each feather: rounded vane around a shaft, rows overlapping like scales
+      for (let r = Math.floor(y) - 1; r <= Math.floor(y) + 1; r++) {
+        const off = (((r % 2) + 2) % 2) * 0.5;
+        for (let c = Math.floor(x - off) - 1; c <= Math.floor(x - off) + 1; c++) {
+          const fx = x - (c + off);
+          const fy = (y - r) / 1.6;
+          if (fy < 0 || fy > 1 || fx < 0 || fx > 1) continue;
+          const half = 0.48 * Math.pow(Math.sin(Math.PI * Math.min(1, fy * 1.05)), 0.6);
+          const dx = Math.abs(fx - 0.5);
+          if (dx > half || r < best) continue;
+          best = r;
+          const shaft = dx < 0.018 + 0.01 * (1 - fy) ? 1 : 0;
+          const barb = 0.5 + 0.5 * Math.sin(2 * Math.PI * (fy * n(p, 'barbs') - dx * n(p, 'barbs') * 0.7));
+          const tone = hash2(((c % sc) + sc) % sc, ((r % sc) + sc) % sc, sd);
+          val = shaft ? 0.95 : 0.3 + barb * 0.35 + tone * 0.15 - (dx / Math.max(0.01, half)) * 0.15;
+        }
+      }
+      return clamp01(val);
+    },
+  },
+  {
+    id: 'horn',
+    label: 'Chifre / casco',
+    group: 'Orgânicos',
+    nums: [N('rings', 'Anéis de crescimento', 2, 40, 12), N('fibres', 'Fibras', 8, 128, 64), N('warp', 'Distorção', 0, 2, 0.6, 0.05), SEED],
+    prepare: (p) => (u, v) => {
+      const sd = n(p, 'seed');
+      const w = (fbm(u, v, 3, 3, 0.5, sd) - 0.5) * n(p, 'warp');
+      const ring = 0.5 + 0.5 * Math.sin((v * Math.round(n(p, 'rings')) + w) * Math.PI * 2);
+      const fib = valueNoise(u, v, Math.round(n(p, 'fibres')), 2, sd + 3);
+      return clamp01(ring * 0.55 + fib * 0.3 + fbm(u, v, 4, 3, 0.5, sd + 6) * 0.15);
     },
   },
 ];

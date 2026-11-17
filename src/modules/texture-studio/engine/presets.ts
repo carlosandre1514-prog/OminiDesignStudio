@@ -7,8 +7,23 @@ import { createLayer, createTextureDoc, pattern, type Layer, type TextureDoc } f
 export interface Preset {
   id: string;
   name: string;
-  group: 'Metais' | 'Revestimentos' | 'Orgânicos' | 'Sintéticos' | 'Sci-fi';
+  group: 'Metais' | 'Revestimentos' | 'Orgânicos' | 'Sintéticos' | 'Sci-fi' | 'Pele e personagens' | 'Animais';
+  /** Shading model the preset is made for (skin = subsurface scattering). */
+  surface?: 'standard' | 'skin';
   build(): Layer[];
+}
+
+/** Human skin: base tone with blood/melanin variation, pores, micro wrinkles, freckles, blemishes, scars to paint. */
+function skin(tone: [string, string], blush: string, freckles: number, spots: string): Layer[] {
+  return [
+    L('Pele', { heightMode: 'normal', content: { colors: tone, pattern: P('noise', { scale: 5, octaves: 5 }), roughA: 0.5, roughB: 0.42, metalA: 0, metalB: 0 } }),
+    L('Poros e microrrugas', { blend: 'multiply', opacity: 0.55, channels: { metal: false }, content: { colors: ['#b98f80', '#ffffff'], pattern: P('skin-pores'), roughA: 0.62, roughB: 0.4, heightAmount: 0.05 } }),
+    L('Vermelhidão (sangue sob a pele)', { blend: 'multiply', opacity: 0.35, channels: { height: false, metal: false, roughness: false }, content: { colors: [blush] }, mask: { kind: 'pattern', pattern: P('grunge', { scale: 3, coverage: 0.45, sharpness: 2 }) } }),
+    L('Sardas e pintas', { blend: 'multiply', opacity: freckles, channels: { height: false, metal: false, roughness: false }, content: { colors: [spots] }, mask: { kind: 'pattern', pattern: P('freckles') } }),
+    L('Oleosidade (testa/nariz — pinte)', { channels: { color: false, height: false, metal: false }, content: { colors: ['#ffffff'], roughA: 0.28, roughB: 0.28 }, opacity: 0.8, mask: { kind: 'paint' } }),
+    L('Cicatrizes (pinte)', { channels: { metal: false }, content: { colors: ['#c98f86', '#e2b0a6'], pattern: P('wrinkles', { scale: 10, stretch: 4 }), roughA: 0.35, roughB: 0.3, heightOffset: 0.03, heightAmount: -0.02 }, mask: { kind: 'paint' } }),
+    L('Sujeira', { blend: 'multiply', opacity: 0, channels: { height: false, metal: false }, content: { colors: ['#6b5a49'], roughA: 0.8, roughB: 0.8 }, mask: { kind: 'curvature', side: 'concave', amount: 0.5, pattern: P('grunge', { scale: 5, coverage: 0.5 }) } }),
+  ];
 }
 
 const L = createLayer;
@@ -168,9 +183,108 @@ export const PRESETS: Preset[] = [
       L('Camadas', { heightMode: 'normal', content: { colors: ['#4a4c50', '#c5c8cc'], pattern: P('wood', { rings: 22, warp: 2.4, grain: 32 }, 0.35, 0.75), roughA: 0.45, roughB: 0.2, metalA: 1, metalB: 1, heightAmount: 0.01 } }),
     ],
   },
+  // ------------------------------------------------------------ for painted models (geometry-aware wear)
+  {
+    id: 'gun-edge-wear',
+    name: 'Arma: cerakote + quinas gastas (modelo 3D)',
+    group: 'Revestimentos',
+    build: () => [
+      L('Aço por baixo', { heightMode: 'normal', content: { colors: ['#8d9298', '#b4b8bd'], pattern: P('brushed'), roughA: 0.35, roughB: 0.25, metalA: 1, metalB: 1 } }),
+      L('Cerakote', { content: { colors: ['#17181a', '#222326'], pattern: P('noise', { scale: 16, octaves: 3 }), roughA: 0.6, roughB: 0.7, metalA: 0, metalB: 0, heightOffset: 0.02, heightAmount: 0.006 } }),
+      L('Quinas gastas', { channels: { height: false }, content: { colors: ['#9ea3a9', '#c5c9ce'], pattern: P('brushed'), roughA: 0.3, roughB: 0.22, metalA: 1, metalB: 1 }, mask: { kind: 'curvature', side: 'convex', amount: 0.26, pattern: P('grunge', { scale: 6, coverage: 0.5, sharpness: 3 }) } }),
+      L('Arranhões finos', { channels: { height: false }, opacity: 0.7, content: { colors: ['#a9adb3'], roughA: 0.3, roughB: 0.3, metalA: 1, metalB: 1 }, mask: { kind: 'pattern', pattern: P('scratches', { count: 60, length: 0.06, width: 0.001, variance: 160 }) } }),
+      L('Poeira nos cantos', { blend: 'multiply', channels: { height: false, metal: false }, opacity: 0.7, content: { colors: ['#7a6e5c'], roughA: 0.9, roughB: 0.9 }, mask: { kind: 'curvature', side: 'concave', amount: 0.5 } }),
+      L('Manchas de mão (pinte)', { channels: { color: false, height: false, metal: false }, content: { colors: ['#ffffff'], roughA: 0.35, roughB: 0.35 }, mask: { kind: 'paint' } }),
+    ],
+  },
+  // ------------------------------------------------------------ skin & characters
+  { id: 'skin-light', name: 'Pele clara (sardas)', group: 'Pele e personagens', surface: 'skin', build: () => skin(['#e2b49c', '#f0c8b2'], '#e08a80', 0.55, '#b27552') },
+  { id: 'skin-medium', name: 'Pele morena', group: 'Pele e personagens', surface: 'skin', build: () => skin(['#b07a58', '#c48d68'], '#c26a5c', 0.25, '#7a4a30') },
+  { id: 'skin-dark', name: 'Pele negra', group: 'Pele e personagens', surface: 'skin', build: () => skin(['#5e3b2a', '#714733'], '#8a3d33', 0.15, '#3a2219') },
+  {
+    id: 'skin-aged',
+    name: 'Pele envelhecida (rugas)',
+    group: 'Pele e personagens',
+    surface: 'skin',
+    build: () => [
+      ...skin(['#d2a28a', '#e0b39b'], '#cf7f74', 0.4, '#8f5d43'),
+      L('Rugas', { blend: 'multiply', opacity: 0.6, channels: { metal: false }, content: { colors: ['#a77c6a', '#ffffff'], pattern: P('wrinkles', { scale: 5, stretch: 3, sharpness: 4 }, 0, 1, true), roughA: 0.5, roughB: 0.45, heightAmount: -0.04 } }),
+    ],
+  },
+  // ------------------------------------------------------------ animals
+  {
+    id: 'reptile',
+    name: 'Escamas de réptil',
+    group: 'Animais',
+    build: () => [
+      L('Escamas', { heightMode: 'normal', content: { colors: ['#2f3a22', '#6d7a3e', '#9aa05a'], pattern: P('scales', { scale: 20, bevel: 0.3 }), roughA: 0.7, roughB: 0.45, heightAmount: 0.12 } }),
+      L('Manchas', { blend: 'multiply', opacity: 0.7, channels: { height: false, metal: false }, content: { colors: ['#4a3a22'] }, mask: { kind: 'pattern', pattern: P('spots', { scale: 6, coverage: 0.4, softness: 0.15 }) } }),
+      L('Brilho úmido', { channels: { color: false, height: false, metal: false }, content: { colors: ['#ffffff'], roughA: 0.25, roughB: 0.25 }, opacity: 0.5, mask: { kind: 'height', side: 'high', amount: 0.3 } }),
+    ],
+  },
+  {
+    id: 'croc',
+    name: 'Couro de crocodilo',
+    group: 'Animais',
+    build: () => [
+      L('Placas', { heightMode: 'normal', content: { colors: ['#2b2a1f', '#55523a', '#7a7552'], pattern: P('scales', { scale: 8, bevel: 0.45, irregular: 0.6 }), roughA: 0.75, roughB: 0.5, heightAmount: 0.18 } }),
+      L('Sulcos escuros', { blend: 'multiply', channels: { height: false, metal: false }, content: { colors: ['#1b1a14'], roughA: 0.9, roughB: 0.9 }, mask: { kind: 'curvature', side: 'concave', amount: 0.6 } }),
+    ],
+  },
+  {
+    id: 'fish-scales',
+    name: 'Escamas de peixe / cobra',
+    group: 'Animais',
+    build: () => [
+      L('Escamas', { heightMode: 'normal', content: { colors: ['#3d4a52', '#9fb3bd', '#d8e4ea'], pattern: P('scales', { kind: 'fish', scale: 24, bevel: 0.25 }), roughA: 0.45, roughB: 0.2, metalA: 0.15, metalB: 0.35, heightAmount: 0.08 } }),
+      L('Dorso escuro', { blend: 'multiply', opacity: 0.6, channels: { height: false, metal: false }, content: { colors: ['#4c5a5f', '#ffffff'], pattern: P('gradient') } }),
+    ],
+  },
+  {
+    id: 'tiger-fur',
+    name: 'Pelo de tigre',
+    group: 'Animais',
+    build: () => [
+      L('Pelos', { heightMode: 'normal', content: { colors: ['#9a4f16', '#e08a33', '#f2b766'], pattern: P('fur', { density: 48, length: 8 }), roughA: 0.85, roughB: 0.7, heightAmount: 0.06 } }),
+      L('Listras', { channels: { height: false, metal: false }, content: { colors: ['#1a1410'], roughA: 0.8, roughB: 0.8 }, mask: { kind: 'pattern', pattern: P('animal-stripes', { count: 9, warp: 1.4, thickness: 0.35 }) } }),
+    ],
+  },
+  {
+    id: 'leopard-fur',
+    name: 'Pelo de onça / leopardo',
+    group: 'Animais',
+    build: () => [
+      L('Pelos', { heightMode: 'normal', content: { colors: ['#9b6a2c', '#d9a85c', '#ecc98c'], pattern: P('fur', { density: 56, length: 6 }), roughA: 0.85, roughB: 0.7, heightAmount: 0.05 } }),
+      L('Rosetas', { channels: { height: false, metal: false }, content: { colors: ['#1f1710'], roughA: 0.8, roughB: 0.8 }, mask: { kind: 'pattern', pattern: P('rosettes') } }),
+    ],
+  },
+  {
+    id: 'wolf-fur',
+    name: 'Pelo de lobo',
+    group: 'Animais',
+    build: () => [
+      L('Pelos', { heightMode: 'normal', content: { colors: ['#2e2b28', '#7a7168', '#c9c0b4'], pattern: P('fur', { density: 40, length: 10, flow: 0.6, clumps: 0.7 }), roughA: 0.9, roughB: 0.75, heightAmount: 0.07 } }),
+      L('Variação', { blend: 'multiply', opacity: 0.6, channels: { height: false, metal: false }, content: { colors: ['#6e5f50', '#ffffff'], pattern: P('noise', { scale: 3 }) } }),
+    ],
+  },
+  {
+    id: 'feathers',
+    name: 'Penas',
+    group: 'Animais',
+    build: () => [L('Penas', { heightMode: 'normal', content: { colors: ['#3b2a1c', '#7d5a3a', '#cdb08a'], pattern: P('feathers'), roughA: 0.75, roughB: 0.55, heightAmount: 0.06 } })],
+  },
+  {
+    id: 'horn',
+    name: 'Chifre / casco',
+    group: 'Animais',
+    build: () => [
+      L('Queratina', { heightMode: 'normal', content: { colors: ['#2d241c', '#6d5a44', '#c8b08a'], pattern: P('horn'), roughA: 0.55, roughB: 0.35, heightAmount: 0.05 } }),
+      L('Pontas gastas', { channels: { height: false, metal: false }, content: { colors: ['#e2d3b4'], roughA: 0.3, roughB: 0.3 }, mask: { kind: 'curvature', side: 'convex', amount: 0.5 } }),
+    ],
+  },
 ];
 
 export function docFromPreset(id: string, name?: string): TextureDoc {
   const p = PRESETS.find((x) => x.id === id) ?? PRESETS[0];
-  return createTextureDoc(name ?? p.name, p.build());
+  return { ...createTextureDoc(name ?? p.name, p.build()), surface: p.surface ?? 'standard' };
 }

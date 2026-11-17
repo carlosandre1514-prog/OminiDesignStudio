@@ -1,5 +1,6 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { lazy, Suspense, useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { db } from '@/core/db/database';
 import type { ModuleEditorProps } from '@/core/modules/registry';
 import { createVersion } from '@/core/projects/projectService';
@@ -10,6 +11,7 @@ import { Outliner } from './components/Outliner';
 import { Viewport } from './components/Viewport';
 import * as P from './mesh/polyMesh';
 import * as ops from './ops';
+import { convertModels, openPaintProject, paintableIds } from './paint3d';
 import { selectEditObject, selectScene, selectedVertexIds, useStudio3D, type GizmoMode, type ViewShading } from './store';
 
 const WeaponGenerator = lazy(() => import('./components/WeaponGenerator').then((m) => ({ default: m.WeaponGenerator })));
@@ -63,6 +65,32 @@ export default function Studio3D({ projectId }: ModuleEditorProps) {
   const presenting = useStudio3D((s) => s.presenting);
   const ortho = useStudio3D((s) => selectScene(s).camera.orthographic);
   const projectName = useLiveQuery(() => db.projects.get(projectId).then((p) => p?.name ?? 'cena'), [projectId]) ?? 'cena';
+  const navigate = useNavigate();
+  const [paintBusy, setPaintBusy] = useState(false);
+  /** Open the 3D painting tool (texture studio) on the selection, or on every visible mesh. */
+  const paint3D = async () => {
+    const s = st();
+    const doc = selectScene(s);
+    const ids = paintableIds(doc, s.selection);
+    if (!ids.length) return toast.error('Nada para pintar: adicione ou selecione uma malha/modelo.');
+    setPaintBusy(true);
+    try {
+      if (ids.some((id) => doc.objects.find((o) => o.id === id)?.type === 'model')) {
+        const next = await convertModels(doc, ids);
+        s.apply(() => next);
+        toast.info('Modelos importados convertidos em malha para receber a pintura.');
+      }
+      await st().saveNow();
+      const first = doc.objects.find((o) => o.id === ids[0]);
+      const name = ids.length === 1 ? first?.name ?? 'objeto' : projectName;
+      const id = await openPaintProject(projectId, projectName, ids, name);
+      navigate(`/project/${id}/texture-studio`);
+    } catch (e) {
+      toast.error(`Não foi possível abrir a pintura 3D: ${e instanceof Error ? e.message : e}`);
+    } finally {
+      setPaintBusy(false);
+    }
+  };
   const [exporting, setExporting] = useState(false);
   const [panel, setPanel] = useState<'left' | 'right' | null>(null);
   const [weapons, setWeapons] = useState(false);
@@ -220,6 +248,9 @@ export default function Studio3D({ projectId }: ModuleEditorProps) {
         </select>
         <div className="ml-auto flex items-center gap-1.5 pl-2">
           <SaveDot />
+          <button className="btn-outline text-xs" onClick={paint3D} disabled={paintBusy} data-testid="paint-3d" title="Pintar texturas direto no modelo (camadas, pincéis, materiais PBR, desgaste automático)">
+            {paintBusy ? 'Preparando…' : '🖌 Pintar em 3D'}
+          </button>
           <button className="btn-ghost text-xs" onClick={async () => { await st().saveNow(); await createVersion(projectId, `Manual ${new Date().toLocaleString('pt-BR')}`); toast.success('Ponto de restauração criado'); }}>Salvar versão</button>
           <button className="btn-ghost text-xs" onClick={() => st().set({ presenting: true })}>Apresentar</button>
           <button className="btn-primary text-xs" onClick={() => setExporting(true)}>Exportar</button>

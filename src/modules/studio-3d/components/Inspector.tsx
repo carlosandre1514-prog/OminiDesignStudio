@@ -256,6 +256,7 @@ function GeometrySection({ o }: { o: Obj3D }) {
           <option value="planarYZ">UV: plano YZ</option>
           <option value="spherical">UV: esférica</option>
           <option value="cylindrical">UV: cilíndrica</option>
+          <option value="atlas">UV: atlas (pintura 3D)</option>
         </select>
       </div>
       <div className="grid grid-cols-2 gap-1">

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import type { ModuleEditorProps } from '@/core/modules/registry';
 import { createVersion } from '@/core/projects/projectService';
 import { toast } from '@/ui/toast';
@@ -10,6 +11,8 @@ import { Preview2D } from './components/Preview2D';
 import { Preview3D } from './components/Preview3D';
 import { usePreview } from './components/usePreview';
 import { PRESETS } from './engine/presets';
+import { render } from './engine/runner';
+import { applyToModel } from './engine/target';
 import { createTextureDoc } from './engine/types';
 import { selectDoc, useTextures } from './store';
 
@@ -43,7 +46,27 @@ export default function TextureStudio({ projectId }: ModuleEditorProps) {
   const [panel, setPanel] = useState<'layers' | 'props' | null>(null);
   const [exporting, setExporting] = useState(false);
   const [photoMat, setPhotoMat] = useState(false);
+  const [applying, setApplying] = useState<number | null>(null);
+  const navigate = useNavigate();
   usePreview();
+
+  /** Bake the stack at full resolution and put it on the 3D Studio objects (material + atlas UVs). */
+  const applyModel = async () => {
+    const d = selectDoc(useTextures.getState());
+    if (!d.target) return;
+    setApplying(0);
+    try {
+      const maps = await render(d, d.resolution, (p) => setApplying(p * 0.8));
+      setApplying(0.85);
+      const r = await applyToModel(d.target, maps, d.name);
+      toast.success(`Pintura aplicada em ${r.objects} objeto(s) do Estúdio 3D`);
+      if (confirm('Pintura aplicada no modelo. Abrir o Estúdio 3D agora?')) navigate(`/project/${d.target.projectId}/3d-studio`);
+    } catch (e) {
+      toast.error(`Falha ao aplicar: ${e instanceof Error ? e.message : e}`);
+    } finally {
+      setApplying(null);
+    }
+  };
 
   useEffect(() => {
     void load(projectId);
@@ -89,12 +112,12 @@ export default function TextureStudio({ projectId }: ModuleEditorProps) {
             const p = PRESETS.find((x) => x.id === e.target.value);
             if (!p) return;
             if (e.target.value && doc.layers.length > 1 && !confirm(`Substituir as camadas atuais pelo material "${p.name}"? (dá para desfazer)`)) return;
-            st().apply((d) => ({ ...createTextureDoc(d.name, p.build()), resolution: d.resolution, previewShape: d.previewShape, previewTiling: d.previewTiling }));
+            st().apply((d) => ({ ...createTextureDoc(d.name, p.build()), resolution: d.resolution, previewShape: d.previewShape, previewTiling: d.previewTiling, target: d.target, modelScale: d.modelScale, surface: p.surface ?? 'standard' }));
             toast.success(`Material "${p.name}" aplicado`);
           }}
         >
           <option value="">Materiais prontos…</option>
-          {(['Metais', 'Revestimentos', 'Orgânicos', 'Sintéticos', 'Sci-fi'] as const).map((g) => (
+          {(['Metais', 'Revestimentos', 'Orgânicos', 'Sintéticos', 'Sci-fi', 'Pele e personagens', 'Animais'] as const).map((g) => (
             <optgroup key={g} label={g}>
               {PRESETS.filter((p) => p.group === g).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
             </optgroup>
@@ -110,6 +133,11 @@ export default function TextureStudio({ projectId }: ModuleEditorProps) {
         <div className="ml-auto flex items-center gap-1.5 pl-2">
           <SaveDot />
           <button className="btn-ghost text-xs" onClick={async () => { await st().saveNow(); await createVersion(projectId, `Manual ${new Date().toLocaleString('pt-BR')}`); toast.success('Ponto de restauração criado'); }}>Salvar versão</button>
+          {doc.target && (
+            <button className="btn-outline text-xs" onClick={applyModel} disabled={applying !== null} data-testid="tex-apply-model" title="Gera os mapas na resolução final e aplica no modelo do Estúdio 3D">
+              {applying !== null ? `Aplicando… ${Math.round(applying * 100)}%` : 'Aplicar no modelo'}
+            </button>
+          )}
           <button className="btn-primary text-xs" onClick={() => setExporting(true)} data-testid="tex-export">Exportar</button>
           <button className="icon-btn lg:hidden" onClick={() => setPanel(panel === 'props' ? null : 'props')} aria-label="Propriedades">⚙</button>
         </div>

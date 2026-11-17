@@ -97,8 +97,20 @@ export interface TextureDoc {
   aoStrength: number;
   /** Repeat count used in the 3D preview. */
   previewTiling: number;
-  previewShape: 'sphere' | 'cube' | 'plane' | 'cylinder' | 'rifle';
+  previewShape: 'sphere' | 'cube' | 'plane' | 'cylinder' | 'rifle' | 'model';
+  /** 3D painting target: objects of a 3D Studio project, painted through one UV atlas. */
+  target?: PaintTarget;
+  /** On a model: repeats of the procedural patterns across the UV atlas (real-world scale). */
+  modelScale?: number;
+  /** Shading model: skin adds subsurface scattering (preview + Godot export). */
+  surface?: 'standard' | 'skin';
   layers: Layer[];
+}
+
+export interface PaintTarget {
+  projectId: string;
+  objectIds: string[];
+  name: string;
 }
 
 export const BLEND_LABELS: Record<BlendMode, string> = {

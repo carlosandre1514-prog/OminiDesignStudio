@@ -39,6 +39,10 @@ Cor base, normal (OpenGL ou DirectX), rugosidade, metálico, altura, oclusão (A
 
 Prévia 3D em esfera, cubo, cilindro, plano ou fuzil, com relevo real (deslocamento). Prévia 2D por mapa, com repetição 2×2 para conferir emendas.
 
+## Pintura 3D no modelo
+
+Para pintar direto num objeto do Estúdio 3D (UV automática, pincel 3D, desgaste pela geometria real, pele/animais e exportação para Godot 4), veja `docs/PINTURA3D.md`.
+
 ## No Arsenal
 
 Em **Materiais → Texturas do Estúdio**, escolha uma textura para cada parte da arma (receptores, polímero, aço, empunhadura…) e a escala real (cm por repetição). Ela entra no visualizador, nas exportações GLB/GLTF e no “Abrir no Estúdio 3D” (com mapas de cor, rugosidade, metálico, normal e AO).

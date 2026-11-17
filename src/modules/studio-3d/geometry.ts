@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import * as P from './mesh/polyMesh';
+import { buildAtlas } from './mesh/uvAtlas';
 import type { GeometrySource, Modifiers, Obj3D, UVProjection } from './model';
 
 /** Polygon mesh for a geometry source (before modifiers). */
@@ -107,19 +108,23 @@ export function toBufferGeometry(m: P.PolyMesh, opts: BuildOptions): THREE.Buffe
     return P.normalize(s);
   };
   let t = 0;
+  const stored = opts.uv === 'atlas' && m.fuv && m.fuv.length === m.f.length ? m.fuv : null;
   m.f.forEach((face, fi) => {
     for (let k = 1; k < face.length - 1; k++) {
       const corners = [face[0], face[k], face[k + 1]];
+      const slots = [0, k, k + 1];
       corners.forEach((vi, c) => {
         const p = P.vget(m, vi);
         const n = cornerNormal(vi, fi);
         pos.set(p, t * 9 + c * 3);
         nor.set(n, t * 9 + c * 3);
-        uv.set(projectUV(p, faceN[fi], opts.uv), t * 6 + c * 2);
+        if (stored) uv.set([stored[fi][slots[c] * 2] ?? 0, stored[fi][slots[c] * 2 + 1] ?? 0], t * 6 + c * 2);
+        else if (opts.uv !== 'atlas') uv.set(projectUV(p, faceN[fi], opts.uv), t * 6 + c * 2);
       });
       triToFace[t++] = fi;
     }
   });
+  if (opts.uv === 'atlas' && !stored) uv.set(buildAtlas(pos).uv);
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
   g.setAttribute('normal', new THREE.BufferAttribute(nor, 3));

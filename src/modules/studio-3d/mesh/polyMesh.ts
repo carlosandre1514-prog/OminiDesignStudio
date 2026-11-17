@@ -7,6 +7,8 @@ export interface PolyMesh {
   v: number[];
   /** Faces as lists of vertex indices (3+ each). */
   f: number[][];
+  /** Optional per-face corner UVs [u0, v0, u1, v1, …] (UV atlas of a painted model). */
+  fuv?: number[][];
 }
 
 export type Vec3 = [number, number, number];

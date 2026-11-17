@@ -1,5 +1,7 @@
 import { getAssetBlob } from '@/core/assets/assetService';
 import { evaluate, type Bitmap, type BitmapSet, type TextureMaps } from './compose';
+import { applyCoverage, brushAlpha, type BrushSettings } from './paint3d';
+import { getTarget } from './target';
 import type { Layer, TextMask, TextureDoc } from './types';
 
 /**
@@ -45,26 +47,29 @@ export function syncPaintSource(layerId: string, src: string) {
   if (hit) hit.src = src;
 }
 
-/** Stamp a soft round brush at UV (wraps around the edges so painting stays seamless). */
-export function dab(canvas: HTMLCanvasElement, u: number, v: number, brush: { size: number; hardness: number; opacity: number; erase: boolean }) {
-  const ctx = canvas.getContext('2d')!;
+/** Stamp the brush tip at UV (wraps around the edges so painting stays seamless). */
+export function dab(canvas: HTMLCanvasElement, u: number, v: number, brush: BrushSettings, dabIndex = 0) {
+  const ctx = canvas.getContext('2d', { willReadFrequently: true })!;
   const r = Math.max(1, brush.size * PAINT_RES * 0.5);
+  const ns = 40 / r;
   for (const ox of [-1, 0, 1])
     for (const oy of [-1, 0, 1]) {
-      const x = (u + ox) * PAINT_RES;
-      const y = (v + oy) * PAINT_RES;
-      if (x < -r || y < -r || x > PAINT_RES + r || y > PAINT_RES + r) continue;
-      const g = ctx.createRadialGradient(x, y, 0, x, y, r);
-      g.addColorStop(0, `rgba(255,255,255,${brush.opacity})`);
-      g.addColorStop(Math.min(0.99, brush.hardness), `rgba(255,255,255,${brush.opacity})`);
-      g.addColorStop(1, 'rgba(255,255,255,0)');
-      ctx.globalCompositeOperation = brush.erase ? 'destination-out' : 'source-over';
-      ctx.fillStyle = g;
-      ctx.beginPath();
-      ctx.arc(x, y, r, 0, Math.PI * 2);
-      ctx.fill();
+      const cx = (u + ox) * PAINT_RES;
+      const cy = (v + oy) * PAINT_RES;
+      const x0 = Math.max(0, Math.floor(cx - r));
+      const y0 = Math.max(0, Math.floor(cy - r));
+      const x1 = Math.min(PAINT_RES, Math.ceil(cx + r));
+      const y1 = Math.min(PAINT_RES, Math.ceil(cy + r));
+      if (x1 <= x0 || y1 <= y0) continue;
+      const img = ctx.getImageData(x0, y0, x1 - x0, y1 - y0);
+      const w = x1 - x0;
+      for (let y = y0; y < y1; y++)
+        for (let x = x0; x < x1; x++) {
+          const cov = brushAlpha(brush, (x + 0.5 - cx) / r, (y + 0.5 - cy) / r, (x - ox * PAINT_RES) * ns, (y - oy * PAINT_RES) * ns, 0, dabIndex);
+          applyCoverage(img.data, (y - y0) * w + (x - x0), cov, brush);
+        }
+      ctx.putImageData(img, x0, y0);
     }
-  ctx.globalCompositeOperation = 'source-over';
 }
 
 // ---------------------------------------------------------------- text & images
@@ -121,6 +126,11 @@ const textCache = new Map<string, Bitmap>();
 /** Collect every bitmap the stack needs. */
 export async function resolveBitmaps(doc: TextureDoc): Promise<BitmapSet> {
   const out: BitmapSet = {};
+  if (doc.target && doc.previewShape === 'model') {
+    // geometry-aware masks (edge wear, cavities) and padding around the UV charts
+    const t = await getTarget(doc.target).catch(() => null);
+    if (t) out['mesh:curv'] = t.bake.curvature;
+  }
   for (const l of doc.layers) {
     if (!l.visible) continue;
     if (l.mask.kind === 'paint') {
