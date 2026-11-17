@@ -136,7 +136,7 @@ function makeNoise(seed: number) {
   };
 }
 
-function makeFbm(seed: number) {
+export function makeFbm(seed: number) {
   const noise = makeNoise(seed);
   return (u: number, v: number, px: number, py: number, oct = 4) => {
     let s = 0;
@@ -152,7 +152,7 @@ function makeFbm(seed: number) {
 }
 
 /** Tileable cellular (Worley) noise: distance to the nearest feature point, 0..~1. */
-function makeCells(seed: number, cells: number) {
+export function makeCells(seed: number, cells: number) {
   const r = rng(seed);
   const pts = Array.from({ length: cells * cells }, () => [r.next(), r.next()]);
   return (u: number, v: number) => {
