@@ -1,5 +1,5 @@
 import type { Params, WeaponPart } from '../catalog';
-import { alongX, B, picatinny, pinZ, place, sector, side, superSector, T, top, tubeX, turnX, type V2 } from './kit';
+import { alongX, B, grip, gripPanels, picatinny, pinZ, place, sector, side, superSector, T, top, tubeX, turnX, type GripShape, type V2 } from './kit';
 
 /**
  * AR-15 pattern carbine, high detail. Real-world proportions (M4-type, 14.5–20" barrels).
@@ -75,29 +75,35 @@ export function buildAR15(p: Params): WeaponPart[] {
   add('Botão do carregador', 'dark', B.merge(pinZ(0.058, -0.038, HW + 0.0012, 0.0042, 0.0026), side(B.circle(0.0062, 20, 0.058, -0.038), HW - 0.0002, HW + 0.0006, 0.0003, [B.circle(0.0047, 20, 0.058, -0.038)], 1)));
 
   // ------------------------------------------------------------------ grip, buffer tube, stock
-  // A2-type pistol grip: ~105 mm along its axis, finger nub, rounded back, raked ~23°
-  const gripLocal: V2[] = [
-    [0.017, 0],
-    [0.0158, -0.02],
-    [0.021, -0.034],
-    [0.0165, -0.046],
-    [0.0158, -0.08],
-    [0.0128, -0.096],
-    [0.004, -0.104],
-    [-0.009, -0.102],
-    [-0.0165, -0.092],
-    [-0.019, -0.05],
-    [-0.0195, -0.012],
-    [-0.0135, 0],
-  ];
+  // Pistol grips are lofted from rounded cross-sections (not flat extrusions), in a frame raked back
+  // from the receiver: x forward, y up along the grip. Real sizes: ~100 mm long, ~29 mm wide, ~40 mm deep.
   if (s(p, 'grip') === 'ergo') {
-    // modern ergonomic grip: steeper angle, beavertail over the web of the hand, no finger nub, stippled panels
-    const ergo: V2[] = [[0.0168, 0], [0.016, -0.03], [0.0158, -0.07], [0.013, -0.094], [0.005, -0.103], [-0.009, -0.1], [-0.0175, -0.088], [-0.0215, -0.05], [-0.0225, -0.016], [-0.029, -0.006], [-0.0305, 0.003], [-0.024, 0.009], [-0.012, 0.008]];
+    // modern ergonomic grip (BCM/MOE-type): steeper rake, straight front strap, beavertail over the
+    // web of the hand, palm swell, flat base; textured side panels
+    const ergo: GripShape = {
+      front: [[0.0172, 0.006], [0.017, -0.012], [0.0166, -0.035], [0.0162, -0.06], [0.0158, -0.084], [0.0148, -0.102]],
+      back: [[-0.0305, 0.006], [-0.031, 0.0], [-0.0285, -0.0065], [-0.0238, -0.0135], [-0.0214, -0.024], [-0.022, -0.045], [-0.0226, -0.066], [-0.0208, -0.088], [-0.0188, -0.102]],
+      half: [[0.0108, 0.006], [0.0116, -0.008], [0.0134, -0.028], [0.0144, -0.055], [0.0146, -0.082], [0.014, -0.102]],
+      base: -0.102,
+      round: 0.0045,
+      taperFront: 0.32,
+      taperBack: (y) => 0.12 + 0.36 * Math.min(1, Math.max(0, (y + 0.02) / 0.016)),
+    };
     const T0 = [T.at(0.006, -0.0405, 0), T.rz(-0.3)];
-    add('Empunhadura ergonômica', 'polymer', place(side(ergo, -0.0145, 0.0145, 0.0045, [], 3), ...T0));
-    const panel: V2[] = [[0.011, -0.022], [0.011, -0.082], [0.002, -0.092], [-0.012, -0.086], [-0.016, -0.05], [-0.016, -0.022]];
-    add('Textura da empunhadura', 'grip', B.merge(place(side(panel, 0.0136, 0.0151, 0.0005, [], 1), ...T0), place(side(panel, -0.0151, -0.0136, 0.0005, [], 1), ...T0)));
-  } else add('Empunhadura', 'polymer', place(side(gripLocal, -0.0138, 0.0138, 0.006, [], 3), T.at(0.006, -0.0405, 0), T.rz(-0.4)));
+    add('Empunhadura ergonômica', 'polymer', place(grip(ergo, 0.006), ...T0), 'smooth');
+    add('Textura da empunhadura', 'grip', place(gripPanels(ergo, -0.02, -0.09, Math.PI / 2 + 0.12, 0.95), ...T0), 'smooth', false);
+  } else {
+    // A2-type: finger nub on the front strap, rounded back, raked ~23°
+    const a2: GripShape = {
+      front: [[0.017, 0.006], [0.017, -0.004], [0.0158, -0.02], [0.0206, -0.034], [0.0165, -0.047], [0.0158, -0.078], [0.0136, -0.094], [0.0105, -0.102]],
+      back: [[-0.0135, 0.006], [-0.0145, -0.004], [-0.0192, -0.014], [-0.0195, -0.05], [-0.0178, -0.085], [-0.0135, -0.102]],
+      half: [[0.0112, 0.006], [0.0124, -0.01], [0.0137, -0.03], [0.0138, -0.09], [0.0132, -0.102]],
+      base: -0.102,
+      round: 0.004,
+      taperFront: 0.38,
+    };
+    add('Empunhadura', 'polymer', place(grip(a2, 0.006), T.at(0.006, -0.0405, 0), T.rz(-0.4)), 'smooth');
+  }
   add('Tubo do amortecedor', 'dark', B.merge(turnX([[0, -0.192], [0.0136, -0.19], [0.0146, -0.186], [0.0146, -0.012], [0.0146, 0]], 0.0035, 0, 32), tubeX([[0.0146, -0.012], [0.018, -0.012], [0.018, -0.004], [0.0146, -0.004]], 0.0035, 0, 12)));
   add('Placa traseira', 'dark', side([[-0.0135, -0.013], [-0.0115, -0.013], [-0.0115, 0.02], [-0.0135, 0.02]], -0.014, 0.014, 0.0005));
   if (s(p, 'stock') !== 'nenhuma') {
@@ -249,15 +255,15 @@ export function buildAR15(p: Params): WeaponPart[] {
   const magTop = -0.03;
   const magLen = n(p, 'magLen');
   const curve = (steel ? 0.05 : 0.034) * (magLen / 0.17);
-  for (let i = 0; i <= 10; i++) {
-    const t = i / 10;
+  // last section ~1.5 mm above the bottom: a support loop so subdivision keeps the base square to the floor plate
+  for (const t of [...Array.from({ length: 10 }, (_, i) => i / 10), 1 - 0.0015 / magLen, 1]) {
     const y = magTop - t * magLen;
     const dx = curve * t ** 1.6;
     magSections.push(magOutline(0.0225).map(([x, z]) => [0.099 + x + dx, y, z] as [number, number, number]));
   }
   add('Carregador', steel ? 'anodized' : 'polymer', B.loft(magSections));
   const baseX = 0.099 + curve + 0.002;
-  add('Base do carregador', steel ? 'dark' : 'polymer', place(top(B.roundedRect(0.066, 0.0262, 0.004, 3, 0, 0), -0.0032, 0.0032, 0.0012), T.at(baseX + 0.001, magTop - magLen - 0.0028, 0), T.rz(-0.04)));
+  add('Base do carregador', steel ? 'dark' : 'polymer', place(top(B.roundedRect(0.066, 0.0262, 0.004, 3, 0, 0), -0.0032, 0.0032, 0.0012), T.at(baseX + 0.001, magTop - magLen - 0.0018, 0), T.rz(-0.04)));
   if (!steel) {
     // PMAG-type: textured waffle panels on both sides
     const bumps = [];

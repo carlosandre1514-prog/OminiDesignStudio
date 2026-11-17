@@ -1,3 +1,4 @@
+import * as THREE from 'three';
 import * as B from '../../mesh/builders';
 import { place, T, type V2 } from '../../mesh/builders';
 import type * as P from '../../mesh/polyMesh';
@@ -151,4 +152,106 @@ export function superSector(a: number, b: number, wall: number, n: number, t0: n
   for (let i = 0; i <= k; i++) out.push(pt(t0 + ((t1 - t0) * i) / k, a, b));
   for (let i = k; i >= 0; i--) out.push(pt(t0 + ((t1 - t0) * i) / k, a - wall, b - wall));
   return out;
+}
+
+// ---------------------------------------------------------------- organic grips
+
+/** Side-view profile given top → bottom as (value, y) points, smoothed (Catmull–Rom) and read at any height. */
+function profileAt(pts: V2[]) {
+  const smp = new THREE.SplineCurve(pts.map(([x, y]) => new THREE.Vector2(x, y))).getPoints(240);
+  return (y: number) => {
+    if (y >= smp[0].y) return smp[0].x;
+    for (let i = 1; i < smp.length; i++)
+      if (smp[i].y <= y) {
+        const a = smp[i - 1];
+        const b = smp[i];
+        return a.x + ((b.x - a.x) * (a.y - y)) / (a.y - b.y || 1);
+      }
+    return smp[smp.length - 1].x;
+  };
+}
+
+/**
+ * Pistol-grip shape in its own frame (x forward, y up along the grip, z across). Profiles are given
+ * top → bottom: front strap and back strap as (x, y), half width as (halfWidth, y).
+ */
+export interface GripShape {
+  front: V2[];
+  back: V2[];
+  half: V2[];
+  /** y of the flat base */
+  base: number;
+  /** radius of the rounded base edge */
+  round?: number;
+  /** how much narrower the front strap is than the middle (0..1) */
+  taperFront?: number;
+  /** same for the back strap, by height (e.g. a narrow beavertail on top) */
+  taperBack?: (y: number) => number;
+  /** superellipse exponent of the cross-section (2 = ellipse, higher = boxier) */
+  power?: number;
+}
+
+/** Point of the grip surface at height y and angle phi (0 = front strap, π/2 = right side, π = back strap). */
+export function gripSurface(g: GripShape) {
+  const F = profileAt(g.front);
+  const Bk = profileAt(g.back);
+  const H = profileAt(g.half);
+  const e = 2 / (g.power ?? 2.5);
+  const tf = g.taperFront ?? 0.3;
+  return (y: number, phi: number, inset = 0): P.Vec3 => {
+    const xf = F(y) - inset;
+    const xb = Bk(y) + inset;
+    const hw = H(y) - inset;
+    const c = Math.cos(phi);
+    const sn = Math.sin(phi);
+    const cx = Math.sign(c) * Math.abs(c) ** e;
+    const sz = Math.sign(sn) * Math.abs(sn) ** e;
+    const taper = 1 - (c >= 0 ? tf : (g.taperBack?.(y) ?? 0.12)) * c * c;
+    return [(xf + xb) / 2 + ((xf - xb) / 2) * cx, y, hw * sz * taper];
+  };
+}
+
+/** Rounded, lofted pistol grip from `top` down to the base, with a rounded base edge. */
+export function grip(g: GripShape, top: number, rings = 20, around = 28): P.PolyMesh {
+  const S = gripSurface(g);
+  const r = g.round ?? 0.004;
+  const nr = rv(rings);
+  const na = rv(around);
+  const sections: P.Vec3[][] = [];
+  const ring = (y: number, inset: number) => Array.from({ length: na }, (_, i) => S(y, (i / na) * Math.PI * 2, inset));
+  for (let k = 0; k < nr; k++) sections.push(ring(top + ((g.base + r - top) * k) / nr, 0));
+  const steps = sg(4);
+  for (let k = 0; k <= steps; k++) {
+    const a = (k / steps) * (Math.PI / 2);
+    sections.push(ring(g.base + r - r * Math.sin(a), r * (1 - Math.cos(a))));
+  }
+  return B.loft(sections);
+}
+
+/**
+ * Raised textured panel following the grip surface on both sides: rows from y0 to y1, centred on
+ * angle `phi` (from the front strap) with half-span `span`, rounded ends. Thin shell: no subdivision.
+ */
+export function gripPanels(g: GripShape, y0: number, y1: number, phi: number, span: number, raise = 0.0005, rows = 16, cols = 12): P.PolyMesh {
+  const S = gripSurface(g);
+  const nr = rv(rows);
+  const nc = rv(cols);
+  const panel = (sideSign: number) => {
+    const sections: P.Vec3[][] = [];
+    for (let j = 0; j <= nr; j++) {
+      const v = j / nr;
+      const q = Math.max(0.3, (1 - Math.abs(2 * v - 1) ** 4) ** 0.25);
+      const y = y0 + (y1 - y0) * v;
+      const outer: P.Vec3[] = [];
+      const inner: P.Vec3[] = [];
+      for (let i = 0; i <= nc; i++) {
+        const a = sideSign * (phi + span * q * ((2 * i) / nc - 1));
+        outer.push(S(y, a, -raise));
+        inner.unshift(S(y, a, raise));
+      }
+      sections.push([...outer, ...inner]);
+    }
+    return B.loft(sections);
+  };
+  return B.merge(panel(1), panel(-1));
 }
