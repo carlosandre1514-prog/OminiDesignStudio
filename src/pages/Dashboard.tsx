@@ -1,7 +1,7 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { listProjects } from '@/core/projects/projectService';
+import { createProject, listProjects } from '@/core/projects/projectService';
 import { libraryStats } from '@/core/assets/assetService';
 import { formatBytes } from '@/core/utils/download';
 import { listModules } from '@/core/modules/registry';
@@ -20,6 +20,13 @@ export default function Dashboard() {
   const recent = [...(projects ?? [])].sort((a, b) => (b.lastOpenedAt ?? b.updatedAt) - (a.lastOpenedAt ?? a.updatedAt)).slice(0, 8);
   const favorites = (projects ?? []).filter((p) => p.favorite);
 
+  /** New texture project opened straight in the texture studio (engine loaded on demand). */
+  const newTexture = async () => {
+    const { docFromPreset } = await import('@/modules/texture-studio/engine/presets');
+    const meta = await createProject({ name: 'Nova textura', category: '3d', modules: { 'texture-studio': docFromPreset('cerakote-black', 'Nova textura') }, tags: ['textura'] });
+    navigate(`/project/${meta.id}/texture-studio`);
+  };
+
   const openImport = async () => {
     const f = await pickFile(PROJECT_ACCEPT);
     if (!f) return;
@@ -36,6 +43,7 @@ export default function Dashboard() {
         </div>
         <div className="flex flex-wrap gap-2">
           <Link to="/arsenal" className="btn-outline" data-testid="open-arsenal">⌖ Arsenal 3D</Link>
+          <button className="btn-outline" onClick={newTexture} data-testid="new-texture">▦ Estúdio de Texturas</button>
           <button className="btn-outline" onClick={openImport}>Abrir / importar…</button>
           <button className="btn-primary" onClick={() => { setTpl(undefined); setNewOpen(true); }}>+ Novo projeto</button>
         </div>

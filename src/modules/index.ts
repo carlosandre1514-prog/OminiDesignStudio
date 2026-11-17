@@ -35,6 +35,17 @@ registerModule({
 });
 
 registerModule({
+  id: 'texture-studio',
+  name: 'Estúdio de Texturas',
+  description: 'Materiais PBR por camadas: padrões procedurais, máscaras, pintura, texto/decalques, desgaste e exportação de mapas.',
+  icon: '▦',
+  phase: 4,
+  status: 'available',
+  defaultFor: [],
+  editor: lazy(() => import('./texture-studio/TextureStudio')),
+});
+
+registerModule({
   id: 'game-design',
   name: 'Game Design Studio',
   description: 'GDD, editor 2D, tilemaps, spritesheets e lógica visual por nodes.',
