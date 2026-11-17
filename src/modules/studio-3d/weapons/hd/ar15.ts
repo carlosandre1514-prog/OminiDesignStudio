@@ -89,7 +89,14 @@ export function buildAR15(p: Params): WeaponPart[] {
     [-0.0195, -0.012],
     [-0.0135, 0],
   ];
-  add('Empunhadura', 'polymer', place(side(gripLocal, -0.0138, 0.0138, 0.006, [], 3), T.at(0.006, -0.0405, 0), T.rz(-0.4)));
+  if (s(p, 'grip') === 'ergo') {
+    // modern ergonomic grip: steeper angle, beavertail over the web of the hand, no finger nub, stippled panels
+    const ergo: V2[] = [[0.0168, 0], [0.016, -0.03], [0.0158, -0.07], [0.013, -0.094], [0.005, -0.103], [-0.009, -0.1], [-0.0175, -0.088], [-0.0215, -0.05], [-0.0225, -0.012], [-0.026, -0.002], [-0.028, 0.006], [-0.016, 0.006]];
+    const T0 = [T.at(0.006, -0.0405, 0), T.rz(-0.3)];
+    add('Empunhadura ergonômica', 'polymer', place(side(ergo, -0.0145, 0.0145, 0.0065, [], 3), ...T0));
+    const panel: V2[] = [[0.011, -0.022], [0.011, -0.082], [0.002, -0.092], [-0.012, -0.086], [-0.016, -0.05], [-0.016, -0.022]];
+    add('Textura da empunhadura', 'grip', B.merge(place(side(panel, 0.0136, 0.0151, 0.0005, [], 1), ...T0), place(side(panel, -0.0151, -0.0136, 0.0005, [], 1), ...T0)));
+  } else add('Empunhadura', 'polymer', place(side(gripLocal, -0.0138, 0.0138, 0.006, [], 3), T.at(0.006, -0.0405, 0), T.rz(-0.4)));
   add('Tubo do amortecedor', 'dark', B.merge(turnX([[0, -0.192], [0.0136, -0.19], [0.0146, -0.186], [0.0146, -0.012], [0.0146, 0]], 0.0035, 0, 32), tubeX([[0.0146, -0.012], [0.018, -0.012], [0.018, -0.004], [0.0146, -0.004]], 0.0035, 0, 12)));
   add('Placa traseira', 'dark', side([[-0.0135, -0.013], [-0.0115, -0.013], [-0.0115, 0.02], [-0.0135, 0.02]], -0.014, 0.014, 0.0005));
   if (s(p, 'stock') !== 'nenhuma') {
@@ -188,16 +195,39 @@ export function buildAR15(p: Params): WeaponPart[] {
   // ------------------------------------------------------------------ optics / sights
   const optic = s(p, 'optic');
   const deck = BORE_TO_DECK + 0.0094;
-  if (optic === 'holo') {
-    const ox = 0.09;
+  /** Holographic sight (EOTech-type): base, rear electronics body, rounded hood with real window, battery cap, reticle. */
+  const holo = (ox: number) => {
+    const ay = deck + 0.028; // optical axis
     add('Mira holográfica (corpo)', 'anodized', B.merge(
       side(B.roundedRect(0.1, 0.012, 0.003, 3, ox, deck + 0.006), -0.017, 0.017, 0.002),
-      alongX([[-0.02, deck + 0.011], [0.02, deck + 0.011], [0.02, deck + 0.043], [-0.02, deck + 0.043]], ox + 0.005, ox + 0.05, 0.0025, [[[-0.016, deck + 0.015], [0.016, deck + 0.015], [0.016, deck + 0.039], [-0.016, deck + 0.039]]], 2),
-      alongX(B.roundedRect(0.014, 0.012, 0.003, 3, 0.011, deck + 0.018), ox - 0.045, ox, 0.0015),
+      alongX(B.roundedRect(0.042, 0.035, 0.007, 4, 0, ay), ox - 0.005, ox + 0.05, 0.0025, [B.roundedRect(0.034, 0.026, 0.004, 4, 0, ay)], 2),
+      alongX(B.roundedRect(0.03, 0.018, 0.005, 4, 0, deck + 0.02), ox - 0.048, ox - 0.004, 0.002, [], 2),
+      place(B.lathe([[0, 0], [0.0075, 0], [0.0078, 0.002], [0.0078, 0.006], [0.007, 0.0072], [0, 0.0074]], 28), T.at(ox + 0.03, deck + 0.012, -0.017), T.rx(-Math.PI / 2)),
+      ...[0, 1, 2].map((i) => place(B.lathe([[0, 0], [0.0028, 0], [0.0028, 0.0022], [0, 0.0024]], 14), T.at(ox - 0.048, deck + 0.016 + i * 0.0001, -0.008 + i * 0.008), T.rz(Math.PI / 2))),
       side(B.roundedRect(0.05, 0.004, 0.0015, 2, ox, deck - 0.001), -0.012, 0.012, 0.001),
+      pinZ(ox + 0.02, deck + 0.004, 0.0175, 0.0035, 0.002),
     ));
-    add('Mira holográfica (vidro)', 'lens', alongX([[-0.016, deck + 0.015], [0.016, deck + 0.015], [0.016, deck + 0.039], [-0.016, deck + 0.039]], ox + 0.044, ox + 0.046));
-    add('Retículo', 'glow', alongX(B.circle(0.0012, 12, 0, deck + 0.027), ox + 0.043, ox + 0.0436));
+    add('Mira holográfica (vidro)', 'lens', alongX(B.roundedRect(0.034, 0.026, 0.004, 4, 0, ay), ox + 0.043, ox + 0.045));
+    add('Retículo', 'glow', alongX(B.circle(0.0011, 12, 0, ay), ox + 0.0424, ox + 0.0428));
+  };
+  /** 3× magnifier on a flip-to-side mount, aligned with the holographic sight's axis. */
+  const magnifier = (x0: number) => {
+    const ay = deck + 0.028;
+    add('Lupa 3× (corpo)', 'anodized', B.merge(
+      tubeX([[0.0135, x0], [0.018, x0], [0.0182, x0 + 0.004], [0.0182, x0 + 0.03], [0.016, x0 + 0.038], [0.016, x0 + 0.09], [0.0172, x0 + 0.096], [0.0172, x0 + 0.105], [0.0135, x0 + 0.105]], ay, 0, 40),
+      tubeX([[0.016, x0 + 0.05], [0.0172, x0 + 0.05], [0.0172, x0 + 0.074], [0.016, x0 + 0.074]], ay, 0, 40),
+      side(B.roundedRect(0.042, 0.012, 0.003, 3, x0 + 0.062, deck + 0.006), -0.0145, 0.0145, 0.002),
+      side([[x0 + 0.044, deck + 0.012], [x0 + 0.08, deck + 0.012], [x0 + 0.076, ay - 0.012], [x0 + 0.048, ay - 0.012]], 0.006, 0.0165, 0.0015),
+      place(B.lathe([[0, 0], [0.0042, 0], [0.0042, 0.03], [0, 0.0302]], 18), T.at(x0 + 0.044, deck + 0.016, 0.0165), T.rz(-Math.PI / 2)),
+      place(B.lathe([[0, 0], [0.0055, 0], [0.006, 0.003], [0.006, 0.006], [0, 0.0065]], 20), T.at(x0 + 0.062, ay - 0.014, 0.017), T.rx(Math.PI / 2)),
+    ));
+    add('Lupa 3× (lentes)', 'lens', B.merge(turnX([[0, x0 + 0.003], [0.0135, x0 + 0.003], [0.0135, x0 + 0.005], [0, x0 + 0.005]], ay, 0, 32), turnX([[0, x0 + 0.1], [0.0135, x0 + 0.1], [0.0135, x0 + 0.102], [0, x0 + 0.102]], ay, 0, 32)));
+  };
+  if (optic === 'holo') {
+    holo(0.09);
+  } else if (optic === 'combo') {
+    holo(0.13);
+    magnifier(-0.032);
   } else if (optic === 'reddot') {
     const ox = 0.08;
     add('Red dot (tubo)', 'anodized', B.merge(tubeX([[0.0148, ox - 0.035], [0.0172, ox - 0.035], [0.0172, ox + 0.035], [0.0148, ox + 0.035]], deck + 0.03, 0, 32), side(B.roundedRect(0.04, 0.014, 0.002, 2, ox, deck + 0.008), -0.009, 0.009, 0.0015), side(B.roundedRect(0.05, 0.004, 0.0015, 2, ox, deck), -0.012, 0.012, 0.001), turnX([[0, ox - 0.003], [0.006, ox - 0.003], [0.006, ox + 0.009], [0, ox + 0.009]], deck + 0.049, 0, 16)));
@@ -215,13 +245,13 @@ export function buildAR15(p: Params): WeaponPart[] {
     ));
     add('Luneta (lentes)', 'lens', B.merge(turnX([[0, ox + 0.004], [0.0145, ox + 0.004], [0.0145, ox + 0.006], [0, ox + 0.006]], h, 0, 32), turnX([[0, ox + 0.236], [0.0195, ox + 0.236], [0.0195, ox + 0.238], [0, ox + 0.238]], h, 0, 32)));
   }
-  if (optic === 'iron' || optic === 'holo' || optic === 'reddot') {
+  if (optic === 'iron' || optic === 'holo' || optic === 'reddot' || optic === 'combo') {
     // flip-up back-up iron sights (folded when an optic is mounted)
     const up = optic === 'iron';
     const rear = up
       ? B.merge(side([[0.008, deck], [0.024, deck], [0.022, deck + 0.022], [0.01, deck + 0.022]], -0.009, 0.009, 0.0012, [B.circle(0.0014, 12, 0.016, deck + 0.016)]), side(B.roundedRect(0.02, 0.005, 0.0015, 2, 0.016, deck + 0.0025), -0.011, 0.011, 0.001))
       : side(B.roundedRect(0.024, 0.008, 0.0015, 2, 0.016, deck + 0.004), -0.011, 0.011, 0.0012);
-    add('Alça de mira (rebatível)', 'anodized', rear);
+    if (optic !== 'combo') add('Alça de mira (rebatível)', 'anodized', rear);
     const fx = hgEnd - 0.016;
     const front = up
       ? B.merge(side([[fx - 0.008, deck], [fx + 0.008, deck], [fx + 0.004, deck + 0.026], [fx - 0.004, deck + 0.026]], -0.009, 0.009, 0.0012, [B.roundedRect(0.005, 0.012, 0.002, 2, fx, deck + 0.017)]), side(B.roundedRect(0.0016, 0.012, 0.0006, 1, fx, deck + 0.018), -0.0009, 0.0009, 0.0003, [], 1), side(B.roundedRect(0.02, 0.005, 0.0015, 2, fx, deck + 0.0025), -0.011, 0.011, 0.001))

@@ -1,7 +1,7 @@
 import { Dices, ImageUp, Sparkles, Wand2 } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { CATEGORY_LABELS, WEAPONS, type Category } from '@/modules/studio-3d/weapons/catalog';
+import { CATEGORY_LABELS, QUALITY, WEAPONS, type Category, type MeshQuality } from '@/modules/studio-3d/weapons/catalog';
 import { useArsenal, weaponById } from '../store';
 import { hasWebGPU } from '@/core/ai/runtime';
 import { downloadSizeMB } from '@/core/ai/models';
@@ -121,12 +121,21 @@ export function PromptPanel() {
 
 /** Weapon type picker + procedural shape parameters. */
 export function ModelPanel() {
-  const { weaponId, params, source } = useArsenal(useShallow((s) => ({ weaponId: s.weaponId, params: s.params, source: s.source })));
+  const { weaponId, params, source, quality } = useArsenal(useShallow((s) => ({ weaponId: s.weaponId, params: s.params, source: s.source, quality: s.quality })));
   const weapon = weaponById(weaponId);
   const [cat, setCat] = useState<Category>(weapon.category);
   const st = useArsenal.getState;
   return (
     <Section title="Modelo procedural" icon={<Dices size={16} />} right={<Btn variant="ghost" onClick={() => st().randomize()} aria-label="Variação aleatória" data-testid="arsenal-random"><Dices size={16} /> Variar</Btn>}>
+      {weapon.hd && source === 'catalog' && (
+        <>
+          <Segmented<MeshQuality> label="Qualidade da malha" value={quality} options={(Object.keys(QUALITY) as MeshQuality[]).map((q) => ({ id: q, label: QUALITY[q].label }))} onChange={(q) => st().setQuality(q)} />
+          <p className="text-[11px] leading-snug text-zinc-400" data-testid="quality-note">
+            {QUALITY[quality].note}
+            {quality !== 'normal' && ' — superfícies suavizadas por subdivisão Catmull–Clark com loops de apoio (quinas firmes).'}
+          </p>
+        </>
+      )}
       <Segmented label="Categoria" value={cat} options={(Object.keys(CATEGORY_LABELS) as Category[]).map((c) => ({ id: c, label: CATEGORY_LABELS[c] }))} onChange={(c) => { setCat(c); st().setWeapon(WEAPONS.find((w) => w.category === c)!.id); }} />
       <Segmented label="Tipo" value={source === 'image' ? '' : weaponId} options={WEAPONS.filter((w) => w.category === cat).map((w) => ({ id: w.id, label: w.name }))} onChange={(id) => st().setWeapon(id)} />
       {source === 'catalog' && (

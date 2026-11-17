@@ -1,4 +1,5 @@
-import { Box, Download, FileBox, Loader2, Shapes } from 'lucide-react';
+import { Box, Camera, Download, FileBox, Loader2, Shapes } from 'lucide-react';
+import { RenderDialog } from './RenderDialog';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { downloadBlob } from '@/core/utils/download';
@@ -20,6 +21,7 @@ export function ExportBar({ compact = false }: { compact?: boolean }) {
   const p = useProfile();
   const navigate = useNavigate();
   const [busy, setBusy] = useState<string | null>(null);
+  const [rendering, setRendering] = useState(false);
   const base = () => {
     const s = useArsenal.getState();
     return slugify(s.source === 'image' ? `silhueta-${s.imageName.replace(/\.[^.]+$/, '')}` : weaponById(s.weaponId).name, 'arma');
@@ -65,9 +67,13 @@ export function ExportBar({ compact = false }: { compact?: boolean }) {
           {busy === id ? <Loader2 className="animate-spin" size={16} /> : <Icon size={16} />} {label}
         </Btn>
       ))}
+      <Btn variant="primary" onClick={() => setRendering(true)} disabled={!!busy} title="Imagem em alta resolução (até 8K)" data-testid="arsenal-render">
+        <Camera size={16} /> Render 8K
+      </Btn>
       <Btn variant="ghost" onClick={toStudio} disabled={!!busy} title="Cria um projeto 3D editável com a arma" data-testid="arsenal-to-studio">
         {busy === 'studio' ? <Loader2 className="animate-spin" size={16} /> : <Box size={16} />} Abrir no Estúdio 3D
       </Btn>
+      {rendering && <RenderDialog onClose={() => setRendering(false)} />}
     </div>
   );
 }

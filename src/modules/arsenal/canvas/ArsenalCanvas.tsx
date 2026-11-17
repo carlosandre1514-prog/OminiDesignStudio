@@ -5,8 +5,71 @@ import * as THREE from 'three';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { useArsenal } from '../store';
 import { exportRoot, WeaponModel } from './WeaponModel';
+import { bridge } from './renderImage';
 
 /** Studio PBR lighting: soft box lights (reflections on metal), key light with shadow, rim light. */
+export type SceneLook = 'estudio' | 'dramatico' | 'claro';
+export const SCENE_LABELS: Record<SceneLook, string> = { estudio: 'Estúdio', dramatico: 'Estúdio dramático', claro: 'Fundo claro (produto)' };
+
+/** Key spot aimed at the weapon (its target must live in the scene graph to be used). */
+function KeySpot() {
+  const light = useRef<THREE.SpotLight>(null);
+  const scene = useThree((st) => st.scene);
+  useEffect(() => {
+    const l = light.current;
+    if (!l) return;
+    l.target.position.set(0.12, 0.05, 0);
+    scene.add(l.target);
+    return () => {
+      scene.remove(l.target);
+    };
+  }, [scene]);
+  return <spotLight ref={light} position={[0.35, 1.75, 1.05]} angle={0.34} penumbra={0.85} intensity={34} decay={2} castShadow shadow-mapSize={[4096, 4096]} shadow-bias={-0.0002} shadow-radius={6} />;
+}
+
+/** Dark studio with a hard key spot, coloured rim lights, light strips for long metal reflections and a glossy floor. */
+function DramaticLighting() {
+  return (
+    <>
+      <color attach="background" args={['#08090c']} />
+      <ambientLight intensity={0.04} />
+      <KeySpot />
+      <directionalLight position={[-2.2, 1.1, -2.2]} intensity={3.2} color="#8ec5ff" />
+      <directionalLight position={[2.6, 0.7, -1.4]} intensity={1.8} color="#ffb070" />
+      <directionalLight position={[0, 0.6, 3]} intensity={0.22} />
+      <Environment resolution={256} environmentIntensity={0.7}>
+        <color attach="background" args={['#030305']} />
+        <Lightformer form="rect" intensity={7} position={[0, 3.2, 0.4]} rotation-x={Math.PI / 2} scale={[7, 0.35, 1]} />
+        <Lightformer form="rect" intensity={4} position={[-3.5, 1.2, -1.5]} rotation-y={Math.PI / 2.6} scale={[0.25, 4, 1]} color="#a9d4ff" />
+        <Lightformer form="rect" intensity={3} position={[3.5, 1.0, -1.2]} rotation-y={-Math.PI / 2.6} scale={[0.25, 4, 1]} color="#ffc28a" />
+        <Lightformer form="rect" intensity={1.2} position={[0, 1.5, 4]} scale={[4, 1.2, 1]} />
+      </Environment>
+      <mesh rotation-x={-Math.PI / 2} position={[0, -0.0008, 0]} receiveShadow>
+        <planeGeometry args={[30, 30]} />
+        <meshStandardMaterial color="#0a0b0e" roughness={0.42} metalness={0.25} />
+      </mesh>
+    </>
+  );
+}
+
+/** Bright seamless product-shot background. */
+function BrightLighting() {
+  return (
+    <>
+      <color attach="background" args={['#e7e9ed']} />
+      <ambientLight intensity={0.5} />
+      <directionalLight position={[2, 4, 3]} intensity={2.4} castShadow shadow-mapSize={[2048, 2048]} shadow-bias={-0.0004} />
+      <directionalLight position={[-3, 2, -2]} intensity={1.2} />
+      <Environment resolution={256} environmentIntensity={1.4}>
+        <color attach="background" args={['#f2f3f5']} />
+        <Lightformer form="rect" intensity={3} position={[0, 5, 2]} scale={[10, 3, 1]} />
+        <Lightformer form="rect" intensity={1.5} position={[-6, 1.5, 0]} rotation-y={Math.PI / 2} scale={[6, 3, 1]} />
+        <Lightformer form="rect" intensity={1.5} position={[6, 1.5, 0]} rotation-y={-Math.PI / 2} scale={[6, 3, 1]} />
+      </Environment>
+    </>
+  );
+}
+
 function StudioLighting() {
   return (
     <>
@@ -27,6 +90,39 @@ function StudioLighting() {
   );
 }
 
+function SceneSwitch() {
+  const look = useArsenal((s) => s.scene);
+  if (look === 'dramatico')
+    return (
+      <>
+        <DramaticLighting />
+        <ContactShadows position={[0, -0.0005, 0]} opacity={0.85} scale={4} blur={1.6} far={1} resolution={1024} frames={Infinity} />
+      </>
+    );
+  return (
+    <>
+      <color attach="background" args={[look === 'claro' ? '#e7e9ed' : '#343a45']} />
+      {look === 'claro' ? <BrightLighting /> : <StudioLighting />}
+      <ContactShadows position={[0, -0.001, 0]} opacity={look === 'claro' ? 0.45 : 0.55} scale={4} blur={2.4} far={1.5} resolution={512} frames={Infinity} />
+    </>
+  );
+}
+
+/** Registers the renderer/scene/camera so stills can be rendered at any resolution. */
+function RenderBridgeProbe() {
+  const gl = useThree((s) => s.gl);
+  const scene = useThree((s) => s.scene);
+  const camera = useThree((s) => s.camera) as THREE.PerspectiveCamera;
+  const setFrameloop = useThree((s) => s.setFrameloop);
+  useEffect(() => {
+    bridge.current = { ...(bridge.current ?? {}), gl, scene, camera, setFrameloop };
+    return () => {
+      bridge.current = null;
+    };
+  }, [gl, scene, camera, setFrameloop]);
+  return null;
+}
+
 /** Frames per second + triangle count, reported to the store twice a second. */
 function StatsProbe() {
   const acc = useRef({ frames: 0, time: 0 });
@@ -39,7 +135,7 @@ function StatsProbe() {
       let tris = 0;
       exportRoot.current?.traverse((o) => {
         const m = o as THREE.Mesh;
-        if (m.isMesh && m.visible) tris += (m.geometry.getAttribute('position')?.count ?? 0) / 3;
+        if (m.isMesh && m.visible) tris += (m.geometry.index ? m.geometry.index.count : (m.geometry.getAttribute('position')?.count ?? 0)) / 3;
       });
       const prev = useArsenal.getState().stats;
       if (prev.fps !== fps || prev.tris !== tris) useArsenal.getState().set({ stats: { fps, tris } });
@@ -123,6 +219,26 @@ const CameraRig = forwardRef<CameraApi, { autoRotate: boolean }>(function Camera
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [parts]);
 
+  useEffect(() => {
+    if (!bridge.current) return;
+    bridge.current.frameFor = (aspect: number) => {
+      const c = controls.current;
+      const pos = camera.position.clone();
+      const target = c?.target.clone();
+      const prev = camera.aspect;
+      camera.aspect = aspect;
+      frame();
+      camera.aspect = prev;
+      return () => {
+        camera.position.copy(pos);
+        if (c && target) {
+          c.target.copy(target);
+          c.update();
+        }
+      };
+    };
+  });
+
   useImperativeHandle(ref, () => ({
     orbit(dTheta, dPhi) {
       const c = controls.current;
@@ -163,10 +279,9 @@ export const ArsenalCanvas = forwardRef<CameraApi, { autoRotate: boolean }>(func
       onPointerMissed={() => useArsenal.getState().set({ selected: null })}
       data-testid="arsenal-canvas"
     >
-      <color attach="background" args={['#343a45']} />
-      <StudioLighting />
+      <SceneSwitch />
       <WeaponModel />
-      <ContactShadows position={[0, -0.001, 0]} opacity={0.55} scale={4} blur={2.4} far={1.5} resolution={512} frames={Infinity} />
+      <RenderBridgeProbe />
       <CameraRig ref={ref} autoRotate={autoRotate} />
       <StatsProbe />
     </Canvas>

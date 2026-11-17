@@ -35,6 +35,20 @@ describe('parsePrompt (local text-to-3D)', () => {
     expect(parsePrompt('glock 9mm nova').finish.wear).toBeLessThan(0.1);
   });
 
+  it('reads an English hyper-realistic render prompt', () => {
+    const r = parsePrompt('Hyper-realistic 3D render of a modern tactical assault rifle, intricate mechanical details, matte black and dark titanium finish, subtle wear and tear on edges, ergonomic polymer grip, picatinny rail with optical scope and holographic sight, studio lighting, dramatic shadows, Unreal Engine 5 render, 8k resolution, photorealistic masterpiece --ar 16:9');
+    expect(r.weapon.id).toBe('ar15-hd');
+    expect(r.params.optic).toBe('combo');
+    expect(r.params.grip).toBe('ergo');
+    expect(r.finish.coat).toBe('preto-fosco');
+    expect(r.finish.steel).toBe('titanio');
+    expect(r.finish.wear).toBeCloseTo(0.3);
+    expect(r.quality).toBe('cinema');
+    expect(r.scene).toBe('dramatico');
+    expect(r.render).toEqual({ res: '8k', aspect: '16:9' });
+    expect(r.ignored).toEqual([]);
+  });
+
   it('falls back to a default type and reports unknown words', () => {
     const r = parsePrompt('objeto misterioso flutuante');
     expect(r.understood[0]).toMatch(/padrão/);

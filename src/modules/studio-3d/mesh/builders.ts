@@ -133,7 +133,13 @@ export function extrude(outline: V2[], depth: number, holes: V2[][] = []): P.Pol
     inner.map((h) => h.map(([x, y]) => new THREE.Vector2(x, y))),
   );
   const f: number[][] = [];
-  for (const [a, b, c] of tris) {
+  let off = 0;
+  const flatLoops = all.map((l) => {
+    const ids = l.map((_, i) => off + i);
+    off += l.length;
+    return ids;
+  });
+  for (const [a, b, c] of reinsertDropped(tris, flatLoops)) {
     f.push([flatFront[a], flatFront[b], flatFront[c]]);
     f.push([flatBack[c], flatBack[b], flatBack[a]]);
   }
@@ -144,6 +150,41 @@ export function extrude(outline: V2[], depth: number, holes: V2[][] = []): P.Pol
     }
   });
   return orientOutward({ v, f });
+}
+
+
+/**
+ * Earcut drops collinear points, leaving outline edges without a cap triangle (open mesh).
+ * Re-insert every dropped vertex by splitting the triangle that spans over it.
+ * `tris`: triangles as flat indices; `loops`: flat-index rings of the outline and holes.
+ */
+export function reinsertDropped(tris: number[][], loops: number[][]): number[][] {
+  const used = new Set<number>();
+  for (const t of tris) for (const i of t) used.add(i);
+  const out = tris.map((t) => [...t]);
+  for (const loop of loops) {
+    const n = loop.length;
+    for (let k = 0; k < n; k++) {
+      const v = loop[k];
+      if (used.has(v)) continue;
+      // nearest used neighbours along the loop
+      let a = -1;
+      let c = -1;
+      for (let d = 1; d < n && a < 0; d++) if (used.has(loop[(k - d + n) % n])) a = loop[(k - d + n) % n];
+      for (let d = 1; d < n && c < 0; d++) if (used.has(loop[(k + d) % n])) c = loop[(k + d) % n];
+      if (a < 0 || c < 0) continue;
+      const ti = out.findIndex((t) => t.includes(a) && t.includes(c));
+      if (ti < 0) continue;
+      const t = out[ti];
+      const ia = t.indexOf(a);
+      const x = t.find((i) => i !== a && i !== c)!;
+      // keep the cyclic orientation of the original triangle
+      if (t[(ia + 1) % 3] === c) out.splice(ti, 1, [a, v, x], [v, c, x]);
+      else out.splice(ti, 1, [c, v, x], [v, a, x]);
+      used.add(v);
+    }
+  }
+  return out;
 }
 
 /** Tube along a 3D path with a radius function (parallel-transport frames, no twisting artefacts). */
@@ -336,7 +377,13 @@ export function bevelExtrude(outline: V2[], depth: number, bevel: number, holes:
   );
   const back = rings.flatMap((rs) => rs[0]);
   const front = rings.flatMap((rs) => rs[rs.length - 1]);
-  for (const [a, bb, c] of tris) {
+  let off = 0;
+  const flatLoops = loops.map((l) => {
+    const ids = l.map((_, i) => off + i);
+    off += l.length;
+    return ids;
+  });
+  for (const [a, bb, c] of reinsertDropped(tris, flatLoops)) {
     f.push([back[c], back[bb], back[a]]);
     f.push([front[a], front[bb], front[c]]);
   }

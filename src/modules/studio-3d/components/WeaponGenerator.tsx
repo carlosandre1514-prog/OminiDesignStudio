@@ -185,6 +185,7 @@ export function WeaponGenerator({ onClose }: { onClose: () => void }) {
   // Show only the finishes that affect the parts of this weapon.
   const relevant: Record<(typeof FINISH_KEYS)[number], boolean> = {
     steel: usedSlots.has('blade') || usedSlots.has('metal'),
+    coat: usedSlots.has('anodized'),
     trim: usedSlots.has('trim'),
     wood: usedSlots.has('wood'),
     grip: usedSlots.has('grip'),

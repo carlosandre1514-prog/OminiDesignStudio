@@ -20,6 +20,12 @@ export interface PromptResult {
   understood: string[];
   /** Words that looked meaningful but were not recognised. */
   ignored: string[];
+  /** Mesh quality asked for (hyper-realistic, millions of polygons…). */
+  quality?: 'normal' | 'alta' | 'ultra' | 'cinema';
+  /** Scene look (studio lighting, dramatic shadows, white background). */
+  scene?: 'estudio' | 'dramatico' | 'claro';
+  /** Still render settings (8K, --ar 16:9…). */
+  render?: { res?: 'hd' | '4k' | '8k'; aspect?: '16:9' | '4:3' | '1:1' | '9:16' };
 }
 
 /** Lowercase, strip accents and punctuation (except . for calibres). */
@@ -72,9 +78,9 @@ const TYPE_RULES: [string, string[]][] = [
   ['longsword', ['espada longa', 'espada', 'sword', 'montante']],
 ];
 
-const OPTIC_HOLO = ['mira holografica', 'holografica', 'holo', 'eotech'];
+const OPTIC_HOLO = ['mira holografica', 'holografica', 'holo', 'eotech', 'holographic', 'holographic sight'];
 const OPTIC_REDDOT = ['red dot', 'reddot', 'ponto vermelho', 'aimpoint'];
-const OPTIC_SCOPE = ['luneta', 'scope', 'mira telescopica', 'telescopica de mira', 'acog'];
+const OPTIC_SCOPE = ['luneta', 'scope', 'optical scope', 'mira telescopica', 'telescopica de mira', 'acog', 'magnifier', 'lupa', 'optic', 'optica'];
 
 interface Ctx {
   t: string;
@@ -118,13 +124,18 @@ export function parsePrompt(prompt: string, fallbackId = 'assault-rifle'): Promp
   let camo: PromptResult['camo'];
 
   // ---- attachments / shape
-  if (has(t, ...OPTIC_HOLO)) setChoice(c, 'optic', 'holo') || setChoice(c, 'optic', 'reddot') || setChoice(c, 'scope', 'sim');
+  const holoW = has(t, ...OPTIC_HOLO);
+  const scopeW = has(t, ...OPTIC_SCOPE);
+  // "optical scope and holographic sight" → holographic + 3× magnifier (the classic combo)
+  if (holoW && scopeW && setChoice(c, 'optic', 'combo')) void 0;
+  else if (holoW) setChoice(c, 'optic', 'holo') || setChoice(c, 'optic', 'reddot') || setChoice(c, 'scope', 'sim');
   else if (has(t, ...OPTIC_REDDOT)) setChoice(c, 'optic', 'reddot') || setChoice(c, 'scope', 'sim');
   else if (has(t, ...OPTIC_SCOPE)) setChoice(c, 'optic', 'luneta') || setChoice(c, 'scope', 'sim');
   else if (has(t, 'miras mecanicas', 'mira mecanica', 'iron sights', 'massa de mira', 'buis')) setChoice(c, 'optic', 'iron') || setChoice(c, 'optic', 'nenhuma');
   else if (has(t, 'sem mira', 'sem otica')) setChoice(c, 'optic', 'nenhuma');
   if (has(t, 'supressor', 'silenciador', 'suppressor', 'silencer', 'suprimido')) setChoice(c, 'suppressor', 'sim') || setChoice(c, 'muzzle', 'supressor');
   if (has(t, 'lanterna', 'flashlight', 'luz tatica')) setChoice(c, 'light', 'sim');
+  if (has(t, 'ergonomic', 'ergonomica', 'ergonomico', 'ergonomic grip', 'ergonomic polymer grip')) setChoice(c, 'grip', 'ergo');
   if (has(t, 'bipe', 'bipod')) setChoice(c, 'bipod', 'aberto') || setChoice(c, 'bipod', 'sim');
   if (has(t, 'empunhadura frontal', 'foregrip', 'grip vertical')) setChoice(c, 'foregrip', 'sim');
   if (has(t, 'pmag', 'carregador de polimero', 'magazine de polimero')) setChoice(c, 'mag', 'polimero');
@@ -164,10 +175,17 @@ export function parsePrompt(prompt: string, fallbackId = 'assault-rifle'): Promp
 
   // ---- finishes
   const black = has(t, 'preto', 'preta', 'black', 'negro', 'cerakote preto', 'fosco preto');
+  const matte = has(t, 'fosco', 'fosca', 'matte', 'matt');
+  const titanium = has(t, 'titanio', 'titanium', 'dark titanium', 'titanio escuro');
+  if (titanium) {
+    c.f.steel = 'titanio';
+    c.f.coat = black ? 'preto-fosco' : 'titanio';
+    c.out.push(black ? 'Acabamento: preto fosco + titânio escuro' : 'Acabamento: titânio escuro');
+  } else if (black && matte) c.f.coat = 'preto-fosco';
   if (black) {
     c.f.polymer = 'preto';
-    if (!has(t, 'polido', 'cromado', 'inox')) c.f.steel = 'escuro';
-    c.out.push('Acabamento: preto fosco');
+    if (!titanium && !has(t, 'polido', 'cromado', 'inox')) c.f.steel = 'escuro';
+    if (!titanium) c.out.push('Acabamento: preto fosco');
   }
   if (has(t, 'fde', 'tan', 'areia', 'coyote', 'flat dark earth')) {
     c.f.polymer = 'areia';
@@ -217,7 +235,10 @@ export function parsePrompt(prompt: string, fallbackId = 'assault-rifle'): Promp
   if (has(t, 'novo', 'nova', 'nunca usado', 'pristine', 'mint', 'de fabrica')) {
     c.f.wear = 0.05;
     c.out.push('Desgaste: novo');
-  } else if (has(t, 'desgastado', 'desgastada', 'gasto', 'battle worn', 'surrado', 'veterano', 'usado', 'arranhado')) {
+  } else if (has(t, 'subtle wear', 'desgaste sutil', 'leve desgaste', 'subtle wear and tear', 'subtle')) {
+    c.f.wear = 0.3;
+    c.out.push('Desgaste: sutil nas bordas');
+  } else if (has(t, 'desgastado', 'desgastada', 'gasto', 'battle worn', 'surrado', 'veterano', 'usado', 'arranhado', 'wear and tear', 'worn')) {
     c.f.wear = Math.max(c.f.wear, 0.8);
     c.out.push('Desgaste: alto');
   }
@@ -242,11 +263,32 @@ export function parsePrompt(prompt: string, fallbackId = 'assault-rifle'): Promp
   }
 
   // Unrecognised long words, to be transparent about the limits of the vocabulary.
-  const known = new Set(['de', 'com', 'e', 'em', 'cal', 'calibre', 'acabamento', 'mm', 'tatico', 'tatica', 'tactical', 'modelo', 'arma', 'um', 'uma', 'the', 'with', 'and', 'of']);
+  const known = new Set(['de', 'com', 'e', 'em', 'cal', 'calibre', 'acabamento', 'mm', 'tatico', 'tatica', 'tactical', 'modelo', 'arma', 'um', 'uma', 'the', 'with', 'and', 'of', 'modern', 'moderno', 'moderna', 'render', 'resolution', 'resolucao', 'details', 'detalhes', 'mechanical', 'mecanicos', 'finish', 'lighting', 'shadows', 'picatinny', 'rail', 'trilho', 'sight', 'edges', 'bordas', 'tear', 'grip', 'polymer', 'polimero', 'engine', 'unreal', 'masterpiece', 'intricate', 'hyper-realistic', 'photorealistic', 'subtle', 'dark', 'matte', 'studio', 'dramatic', 'optical', 'ergonomic', 'black', 'titanium', 'holographic', 'scope', 'assault', 'rifle', 'wear', '--ar', 'ar']);
   const flat = [...TYPE_RULES.flatMap(([, w]) => w), ...OPTIC_HOLO, ...OPTIC_REDDOT, ...OPTIC_SCOPE].join(' ');
   const ignored = t
     .split(' ')
     .filter((w) => w.length > 3 && !known.has(w) && !matched.has(w) && !flat.includes(w) && !c.out.some((o) => normalize(o).includes(w)) && !/^[\d.]+$/.test(w));
 
-  return { weapon, params: c.p, finish: c.f, camo, understood: c.out, ignored: [...new Set(ignored)].slice(0, 8) };
+  // ---- realism, scene and render settings
+  let quality: PromptResult['quality'];
+  if (has(t, 'hyper-realistic', 'hyperrealistic', 'hiper-realista', 'hiper realista', 'photorealistic', 'fotorrealista', 'ultra realista', 'ultra-realista', 'unreal engine', 'unreal engine 5', 'milhoes de poligonos', 'millions of polygons', 'million polygons', 'high poly', 'intricate', 'masterpiece')) quality = 'cinema';
+  else if (has(t, 'realistic', 'realista', 'detalhado', 'detailed')) quality = 'ultra';
+  if (quality && c.w.hd) c.out.push(`Malha: ${quality === 'cinema' ? 'Cinema (milhões de triângulos)' : 'Ultra'}`);
+  let scene: PromptResult['scene'];
+  if (has(t, 'dramatic', 'dramatico', 'dramatica', 'cinematic', 'cinematografico', 'dramatic shadows', 'sombras dramaticas')) scene = 'dramatico';
+  else if (has(t, 'white background', 'fundo branco', 'fundo claro', 'product shot')) scene = 'claro';
+  else if (has(t, 'studio lighting', 'iluminacao de estudio', 'studio', 'estudio')) scene = 'estudio';
+  if (scene) c.out.push(`Cena: ${scene === 'dramatico' ? 'estúdio dramático' : scene === 'claro' ? 'fundo claro' : 'estúdio'}`);
+  const render: NonNullable<PromptResult['render']> = {};
+  if (has(t, '8k')) render.res = '8k';
+  else if (has(t, '4k', 'uhd')) render.res = '4k';
+  else if (has(t, '1080p', 'full hd', 'fullhd')) render.res = 'hd';
+  const ar = /(\d{1,2})\s*:\s*(\d{1,2})/.exec(prompt);
+  if (ar) {
+    const key = `${ar[1]}:${ar[2]}`;
+    if (key === '16:9' || key === '4:3' || key === '1:1' || key === '9:16') render.aspect = key;
+  }
+  if (render.res || render.aspect) c.out.push(`Render: ${render.res ? render.res.toUpperCase().replace('HD', 'Full HD') : ''}${render.res && render.aspect ? ' ' : ''}${render.aspect ?? ''}`);
+
+  return { weapon, params: c.p, finish: c.f, camo, understood: c.out, ignored: [...new Set(ignored)].slice(0, 8), quality, scene, render: render.res || render.aspect ? render : undefined };
 }

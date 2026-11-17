@@ -70,6 +70,7 @@ export function exportableScene(root: THREE.Object3D): THREE.Scene {
     const geo = m.geometry.clone();
     geo.deleteAttribute('bary');
     geo.deleteAttribute('edgeH');
+    geo.deleteAttribute('curv');
     const mesh = new THREE.Mesh(geo, mat);
     mesh.name = m.name;
     m.matrixWorld.decompose(mesh.position, mesh.quaternion, mesh.scale);

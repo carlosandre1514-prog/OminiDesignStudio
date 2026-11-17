@@ -6,7 +6,8 @@ import { toBufferGeometry } from '@/modules/studio-3d/geometry';
 import { useShallow } from 'zustand/react/shallow';
 import { isHorizontal } from '@/modules/studio-3d/weapons/assemble';
 import type { TextureMaps } from '@/modules/texture-studio/engine/compose';
-import type { Slot } from '@/modules/studio-3d/weapons/catalog';
+import { QUALITY, type Slot } from '@/modules/studio-3d/weapons/catalog';
+import { buildDense } from '../lib/denseRunner';
 import { edgeWearAttributes } from '../lib/surface';
 import { textureProjectMaps } from '../lib/textureLink';
 import { partVisible, useArsenal, weaponById } from '../store';
@@ -82,6 +83,44 @@ export function WeaponModel() {
   const built = model.list;
   useEffect(() => () => built.forEach((b) => b.geometry.dispose()), [built]);
 
+  // High-poly path: subdivide in a worker, swap the geometries in when ready (low-poly shown meanwhile).
+  const quality = useArsenal((s) => s.quality);
+  const levels = source === 'image' ? 0 : QUALITY[quality].subdiv;
+  const [dense, setDense] = useState<THREE.BufferGeometry[] | null>(null);
+  useEffect(() => {
+    setDense(null);
+    if (!levels) return;
+    let alive = true;
+    const st = useArsenal.getState();
+    st.set({ status: { kind: 'busy', text: `Gerando malha ${QUALITY[quality].label} (subdivisão ×${4 ** levels})…` } });
+    buildDense(parts.map((p) => p.mesh), levels, (pr) => alive && useArsenal.getState().set({ status: { kind: 'busy', text: `Gerando malha ${QUALITY[quality].label}: ${Math.round(pr * 100)}%` } }))
+      .then((geos) => {
+        if (!alive) return;
+        let total = 0;
+        const list = geos.map((g) => {
+          const b = new THREE.BufferGeometry();
+          b.setAttribute('position', new THREE.BufferAttribute(g.position, 3));
+          b.setAttribute('normal', new THREE.BufferAttribute(g.normal, 3));
+          const uv = new THREE.BufferAttribute(g.uv, 2);
+          b.setAttribute('uv', uv);
+          b.setAttribute('uv1', uv);
+          b.setAttribute('curv', new THREE.BufferAttribute(g.curv, 1));
+          b.setIndex(new THREE.BufferAttribute(g.index, 1));
+          b.computeBoundingBox();
+          b.computeBoundingSphere();
+          total += g.triangles;
+          return b;
+        });
+        setDense(list);
+        useArsenal.getState().set({ status: { kind: 'ready', text: `Pronto · ${(total / 1e6).toFixed(total > 1e6 ? 2 : 3)} milhões de triângulos` } });
+      })
+      .catch((e) => alive && useArsenal.getState().set({ status: { kind: 'error', text: e instanceof Error ? e.message : 'Falha na malha de alta resolução' } }));
+    return () => {
+      alive = false;
+    };
+  }, [parts, levels, quality]);
+  useEffect(() => () => dense?.forEach((g) => g.dispose()), [dense]);
+
   const group = useRef<THREE.Group>(null);
   useEffect(() => {
     exportRoot.current = group.current;
@@ -116,14 +155,14 @@ export function WeaponModel() {
             meshes.current[i] = m;
           }}
           name={b.part.name}
-          geometry={b.geometry}
+          geometry={dense?.[i] ?? b.geometry}
           material={materials.get(b.part.slot)}
           visible={partVisible({ hidden, solo }, b.part.key)}
           castShadow
           receiveShadow
           onClick={select(b.part.key)}
         >
-          {selected === b.part.key && <Edges threshold={25} color="#22d3ee" />}
+          {selected === b.part.key && !dense && <Edges threshold={25} color="#22d3ee" />}
         </mesh>
       ))}
     </group>

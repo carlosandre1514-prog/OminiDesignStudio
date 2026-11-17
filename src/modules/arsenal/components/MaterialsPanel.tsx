@@ -22,6 +22,7 @@ export function MaterialsPanel() {
   const slots = new Set(parts.map((x) => x.slot));
   const relevant: Record<keyof typeof FINISH_LABELS, boolean> = {
     steel: slots.has('blade') || slots.has('metal'),
+    coat: slots.has('anodized'),
     trim: slots.has('trim'),
     wood: slots.has('wood'),
     grip: slots.has('grip'),

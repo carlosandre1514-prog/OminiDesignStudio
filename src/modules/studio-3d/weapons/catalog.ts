@@ -3,6 +3,7 @@ import { T, place } from '../mesh/builders';
 import * as P from '../mesh/polyMesh';
 import type { Finish } from './textures';
 import { buildAR15 } from './hd/ar15';
+import { detail } from './hd/kit';
 import { buildPistolHD } from './hd/pistol';
 import { buildAK } from './hd/ak';
 import { buildShotgun, buildSMG, buildSniper } from './hd/long';
@@ -775,7 +776,8 @@ const ar15: WeaponType = {
   description: 'Alta definição: receptores bipartidos com janela de ejeção real, Picatinny com fendas, guarda-mão M-LOK vazado, quebra-chamas A2, pinos e controles.',
   nums: [num('barrel', 'Cano (da culatra)', 0.26, 0.51, 0.368, 0.005), num('handguard', 'Guarda-mão', 0.18, 0.38, 0.3, 0.01), num('magLen', 'Carregador', 0.1, 0.2, 0.165, 0.005), num('stockPos', 'Extensão da coronha', 0, 0.08, 0.04, 0.005)],
   choices: [
-    choice('optic', 'Ótica', [['holo', 'Holográfica'], ['reddot', 'Red dot'], ['luneta', 'Luneta LPVO'], ['iron', 'Miras mecânicas'], ['nenhuma', 'Nenhuma']]),
+    choice('optic', 'Ótica', [['holo', 'Holográfica'], ['combo', 'Holográfica + lupa 3×'], ['reddot', 'Red dot'], ['luneta', 'Luneta LPVO'], ['iron', 'Miras mecânicas'], ['nenhuma', 'Nenhuma']]),
+    choice('grip', 'Empunhadura', [['a2', 'Clássica (A2)'], ['ergo', 'Ergonômica']]),
     choice('muzzle', 'Bocal', [['a2', 'Quebra-chamas A2'], ['freio', 'Freio de boca']]),
     choice('mag', 'Carregador', [['aluminio', 'Alumínio'], ['polimero', 'Polímero com janela']]),
     choice('stock', 'Coronha', [['m4', 'M4 retrátil'], ['nenhuma', 'Sem coronha']]),
@@ -876,6 +878,24 @@ export function randomParams(w: WeaponType, seed: number): Params {
   return p;
 }
 
-export function buildWeapon(w: WeaponType, p: Params, seed = 1): WeaponPart[] {
-  return w.build({ ...defaultParams(w), ...p }, B.rng(seed)).filter((part) => part.mesh.f.length > 0);
+/** Mesh quality: base detail of the hard-surface kit and Catmull–Clark subdivision levels applied afterwards. */
+export type MeshQuality = 'normal' | 'alta' | 'ultra' | 'cinema';
+export const QUALITY: Record<MeshQuality, { label: string; seg: number; rev: number; subdiv: number; note: string }> = {
+  normal: { label: 'Normal', seg: 1, rev: 1, subdiv: 0, note: 'leve, ideal para celular' },
+  alta: { label: 'Alta', seg: 2, rev: 1.5, subdiv: 1, note: 'cerca de 100 mil triângulos' },
+  ultra: { label: 'Ultra', seg: 2, rev: 1.5, subdiv: 2, note: 'centenas de milhares de triângulos' },
+  cinema: { label: 'Cinema', seg: 2, rev: 1.5, subdiv: 3, note: 'milhões de triângulos (computador)' },
+};
+
+export function buildWeapon(w: WeaponType, p: Params, seed = 1, quality: MeshQuality = 'normal'): WeaponPart[] {
+  const q = QUALITY[quality];
+  const prev = { ...detail };
+  detail.seg = w.hd ? q.seg : 1;
+  detail.rev = w.hd ? q.rev : 1;
+  detail.support = w.hd && q.subdiv > 0 ? 0.0009 : 0;
+  try {
+    return w.build({ ...defaultParams(w), ...p }, B.rng(seed)).filter((part) => part.mesh.f.length > 0);
+  } finally {
+    Object.assign(detail, prev);
+  }
 }

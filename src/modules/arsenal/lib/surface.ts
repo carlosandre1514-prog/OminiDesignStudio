@@ -88,14 +88,14 @@ export function applyEdgeWear(mat: THREE.MeshStandardMaterial, u: WearUniforms) 
   mat.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, u);
     shader.vertexShader = shader.vertexShader
-      .replace('#include <common>', '#include <common>\nattribute vec3 bary;\nattribute vec3 edgeH;\nvarying vec3 vBary;\nvarying vec3 vEdgeH;\nvarying vec3 vWearPos;')
-      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvBary = bary;\nvEdgeH = edgeH;\nvWearPos = position;');
+      .replace('#include <common>', '#include <common>\nattribute vec3 bary;\nattribute vec3 edgeH;\nattribute float curv;\nvarying vec3 vBary;\nvarying vec3 vEdgeH;\nvarying float vCurv;\nvarying vec3 vWearPos;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvBary = bary;\nvEdgeH = edgeH;\nvCurv = curv;\nvWearPos = position;');
     shader.fragmentShader = shader.fragmentShader
       .replace(
         '#include <common>',
         `#include <common>
 uniform float uWear; uniform vec3 uBare; uniform float uBareMetal;
-varying vec3 vBary; varying vec3 vEdgeH; varying vec3 vWearPos;
+varying vec3 vBary; varying vec3 vEdgeH; varying float vCurv; varying vec3 vWearPos;
 float wHash(vec3 p){ p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
 float wNoise(vec3 x){ vec3 i = floor(x); vec3 f = fract(x); f = f*f*(3.0-2.0*f);
   return mix(mix(mix(wHash(i), wHash(i+vec3(1,0,0)), f.x), mix(wHash(i+vec3(0,1,0)), wHash(i+vec3(1,1,0)), f.x), f.y),
@@ -111,14 +111,18 @@ float wearMask(){
   float fray = wNoise(vWearPos * 2600.0);
   float present = smoothstep(0.5 - uWear * 0.45, 0.6 - uWear * 0.45, patches);
   float width = ${MAX_WEAR_WIDTH.toFixed(5)} * uWear * (0.35 + 1.3 * patches) * (0.6 + 0.8 * fray);
-  return (1.0 - smoothstep(width * 0.5, width, d)) * present;
+  float edge = 1.0 - smoothstep(width * 0.5, width, d);
+  // high-poly (subdivided) meshes: wear where the surface is convex (rounded edges), same chipped breakup
+  float c0 = 0.24 - uWear * 0.12;
+  float curvWear = smoothstep(c0, c0 + 0.08, vCurv * (0.7 + 0.6 * patches));
+  return max(edge, curvWear) * present;
 }`,
       )
       .replace('#include <color_fragment>', '#include <color_fragment>\nfloat wm = wearMask();\ndiffuseColor.rgb = mix(diffuseColor.rgb, uBare, wm);')
       .replace('#include <metalnessmap_fragment>', '#include <metalnessmap_fragment>\nmetalnessFactor = mix(metalnessFactor, 1.0, wm * uBareMetal);')
       .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = mix(roughnessFactor, 0.3, wm * uBareMetal);');
   };
-  mat.customProgramCacheKey = () => 'edge-wear-v4';
+  mat.customProgramCacheKey = () => 'edge-wear-v5';
   mat.needsUpdate = true;
 }
 

@@ -42,3 +42,28 @@ describe('weapon catalog', () => {
     expect(height(0.9)).toBeLessThan(1.3);
   });
 });
+
+describe('high-quality HD meshes', () => {
+  for (const w of WEAPONS.filter((x) => x.hd))
+    it(`${w.name}: support loops keep parts closed and subdividable`, async () => {
+      const { subdivide } = await import('../mesh/polyMesh');
+      const low = buildWeapon(w, {}, 1, 'normal');
+      const hi = buildWeapon(w, {}, 1, 'ultra');
+      expect(hi.length).toBe(low.length);
+      const tri = (m: P.PolyMesh) => m.f.reduce((s, f) => s + f.length - 2, 0);
+      expect(hi.reduce((s, p) => s + tri(p.mesh), 0)).toBeGreaterThan(low.reduce((s, p) => s + tri(p.mesh), 0));
+      for (const part of hi) {
+        expect(P.isClosedManifold(part.mesh), `${part.name} closed`).toBe(true);
+        const sub = subdivide(part.mesh, true);
+        expect(P.isClosedManifold(sub), `${part.name} subdivided closed`).toBe(true);
+        // subdivision must not melt the part: bounding box stays within 10 % / 3 mm
+        const b0 = P.bounds(part.mesh);
+        const b1 = P.bounds(sub);
+        for (let k = 0; k < 3; k++) {
+          const s0 = b0.max[k] - b0.min[k];
+          const s1 = b1.max[k] - b1.min[k];
+          expect(s0 - s1, `${part.name} axis ${k}`).toBeLessThan(Math.max(0.003, s0 * 0.1));
+        }
+      }
+    });
+});

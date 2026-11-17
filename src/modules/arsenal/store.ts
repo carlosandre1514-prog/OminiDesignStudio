@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { buildWeapon, defaultParams, randomParams, WEAPONS, type Params, type WeaponPart, type WeaponType } from '@/modules/studio-3d/weapons/catalog';
+import { buildWeapon, defaultParams, randomParams, WEAPONS, type MeshQuality, type Params, type WeaponPart, type WeaponType } from '@/modules/studio-3d/weapons/catalog';
 import { DEFAULT_FINISH, materialFor, texturesFor, type Finish } from '@/modules/studio-3d/weapons/textures';
 import { parsePrompt, type CamoPattern } from './lib/promptParser';
 import { silhouetteToMesh } from './lib/silhouette';
@@ -30,6 +30,13 @@ export interface ArsenalState {
   /** Photo texture of the current photo-based model. */
   photo: PhotoTexture | null;
   parts: Part[];
+  /** Look of the 3D scene (also used for renders). */
+  scene: 'estudio' | 'dramatico' | 'claro';
+  /** Still render settings (resolution, aspect ratio). */
+  render: { res: 'hd' | '4k' | '8k'; aspect: '16:9' | '4:3' | '1:1' | '9:16' };
+  /** Mesh quality: Normal (light) … Cinema (millions of triangles, Catmull–Clark subdivision). */
+  quality: MeshQuality;
+  setQuality(q: MeshQuality): void;
   // --- surface
   finish: Finish;
   camo: { pattern: CamoPattern; color: string };
@@ -67,8 +74,8 @@ const frame = () => new Promise<void>((r) => (typeof requestAnimationFrame === '
 export const WEAPON_IDS = WEAPONS.map((w) => w.id);
 export const weaponById = (id: string): WeaponType => WEAPONS.find((w) => w.id === id) ?? WEAPONS[0];
 
-function partsFor(s: Pick<ArsenalState, 'source' | 'imagePart' | 'weaponId' | 'params' | 'seed'>): Part[] {
-  const list = s.source === 'image' && s.imagePart ? [s.imagePart] : buildWeapon(weaponById(s.weaponId), s.params, s.seed);
+function partsFor(s: Pick<ArsenalState, 'source' | 'imagePart' | 'weaponId' | 'params' | 'seed'> & { quality?: MeshQuality }): Part[] {
+  const list = s.source === 'image' && s.imagePart ? [s.imagePart] : buildWeapon(weaponById(s.weaponId), s.params, s.seed, s.quality ?? 'normal');
   return list.map((p, i) => ({ ...p, key: `${i}:${p.name}` }));
 }
 
@@ -102,6 +109,10 @@ export const useArsenal = create<ArsenalState>((set, get) => {
     relief: 0.02,
     photo: null,
     parts: partsFor({ source: 'catalog', imagePart: null, weaponId: INITIAL, params: initialParams, seed: 1 }),
+    quality: 'normal',
+    scene: 'estudio',
+    render: { res: '4k', aspect: '16:9' },
+    setQuality: (q) => set({ quality: q, parts: partsFor({ ...get(), quality: q }) }),
     finish: { ...DEFAULT_FINISH, ...weaponById(INITIAL).finish },
     camo: { pattern: 'nenhum', color: '#3a3d41' },
     edgeWear: weaponById(INITIAL).finish?.wear ?? 0.35,
@@ -144,7 +155,8 @@ export const useArsenal = create<ArsenalState>((set, get) => {
       const r = parsePrompt(text, get().weaponId);
       set({ status: { kind: 'busy', text: 'Gerando malha Hard-Surface…' } });
       await frame();
-      const parts = partsFor({ source: 'catalog', imagePart: null, weaponId: r.weapon.id, params: r.params, seed: get().seed });
+      const quality = r.quality && r.weapon.hd ? r.quality : get().quality;
+      const parts = partsFor({ source: 'catalog', imagePart: null, weaponId: r.weapon.id, params: r.params, seed: get().seed, quality });
       set({ status: { kind: 'busy', text: 'Sintetizando texturas PBR…' } });
       await frame();
       warmTextures(parts, r.finish);
@@ -158,6 +170,9 @@ export const useArsenal = create<ArsenalState>((set, get) => {
         edgeWear: r.finish.wear,
         understood: r.understood,
         ignored: r.ignored,
+        quality,
+        ...(r.scene ? { scene: r.scene } : {}),
+        ...(r.render ? { render: { ...get().render, ...r.render } } : {}),
         hidden: {},
         solo: null,
         selected: null,

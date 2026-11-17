@@ -8,7 +8,9 @@ import type { Slot } from './catalog';
  */
 
 export interface Finish {
-  steel: 'polido' | 'escuro' | 'damasco' | 'gasto';
+  steel: 'polido' | 'escuro' | 'damasco' | 'gasto' | 'titanio';
+  /** Coating of anodized aluminium parts (receivers, handguards, optics). */
+  coat: 'grafite' | 'preto-fosco' | 'titanio' | 'fde' | 'oliva';
   trim: 'ouro' | 'latao' | 'bronze' | 'aco';
   wood: 'carvalho' | 'nogueira' | 'ebano' | 'freixo';
   grip: 'couro-marrom' | 'couro-preto' | 'tecido' | 'borracha';
@@ -18,10 +20,11 @@ export interface Finish {
   wear: number;
 }
 
-export const DEFAULT_FINISH: Finish = { steel: 'polido', trim: 'latao', wood: 'nogueira', grip: 'couro-marrom', polymer: 'preto', energy: 'azul', wear: 0.35 };
+export const DEFAULT_FINISH: Finish = { steel: 'polido', coat: 'grafite', trim: 'latao', wood: 'nogueira', grip: 'couro-marrom', polymer: 'preto', energy: 'azul', wear: 0.35 };
 
 export const FINISH_LABELS: { [K in Exclude<keyof Finish, 'wear'>]: { label: string; options: Record<Finish[K], string> } } = {
-  steel: { label: 'Aço / lâmina', options: { polido: 'Polido', escuro: 'Enegrecido', damasco: 'Damasco', gasto: 'Gasto / oxidado' } },
+  steel: { label: 'Aço / lâmina', options: { polido: 'Polido', escuro: 'Enegrecido', damasco: 'Damasco', gasto: 'Gasto / oxidado', titanio: 'Titânio escuro' } },
+  coat: { label: 'Alumínio (receptores)', options: { grafite: 'Grafite', 'preto-fosco': 'Preto fosco', titanio: 'Titânio escuro', fde: 'FDE (areia)', oliva: 'Verde oliva' } },
   trim: { label: 'Detalhes', options: { ouro: 'Ouro', latao: 'Latão', bronze: 'Bronze', aco: 'Aço' } },
   wood: { label: 'Madeira', options: { carvalho: 'Carvalho', nogueira: 'Nogueira', ebano: 'Ébano', freixo: 'Freixo claro' } },
   grip: { label: 'Empunhadura', options: { 'couro-marrom': 'Couro marrom', 'couro-preto': 'Couro preto', tecido: 'Tecido trançado', borracha: 'Borracha' } },
@@ -63,6 +66,8 @@ export function materialFor(slot: Slot, f: Finish): MaterialSpec {
   const steel = (base: 'blade' | 'metal'): MaterialSpec => {
     const rough = base === 'blade' ? 0 : 0.08;
     switch (f.steel) {
+      case 'titanio':
+        return { key: `${base}-titanio`, name: 'Titânio escuro', color: '#ffffff', metalness: 1, roughness: 1, pattern: { kind: 'brushed', dark: [64, 65, 69], light: [100, 101, 106], rough: [0.26 + rough, 0.4], wear: w, seed: 14 } };
       case 'escuro':
         return { key: `${base}-escuro`, name: 'Aço enegrecido', color: '#ffffff', metalness: 0.85, roughness: 1, pattern: { kind: 'blackened', dark: [46, 48, 52], light: [86, 89, 95], rough: [0.34 + rough, 0.55], wear: w, seed: 11 } };
       case 'damasco':
@@ -101,8 +106,19 @@ export function materialFor(slot: Slot, f: Finish): MaterialSpec {
       const [dark, light] = pal[f.polymer];
       return { key: `polymer-${f.polymer}`, name: `Polímero ${FINISH_LABELS.polymer.options[f.polymer].toLowerCase()}`, color: '#ffffff', metalness: 0, roughness: 1, pattern: { kind: 'polymer', dark, light, rough: [0.55, 0.8], wear: w, seed: 61 } };
     }
-    case 'anodized':
-      return { key: 'anodizado', name: 'Alumínio anodizado', color: '#ffffff', metalness: 0.9, roughness: 1, pattern: { kind: 'blackened', dark: [54, 57, 62], light: [82, 86, 92], rough: [0.34, 0.48], wear: w * 0.6, seed: 71 } };
+    case 'anodized': {
+      const c = f.coat ?? 'grafite';
+      if (c === 'titanio')
+        return { key: 'anodizado-titanio', name: 'Titânio escuro', color: '#ffffff', metalness: 1, roughness: 1, pattern: { kind: 'brushed', dark: [66, 67, 70], light: [98, 99, 103], rough: [0.3, 0.42], wear: w * 0.5, seed: 74 } };
+      const pal: Record<Exclude<Finish['coat'], 'titanio'>, { d: RGB; l: RGB; r: [number, number]; m: number; name: string }> = {
+        grafite: { d: [54, 57, 62], l: [82, 86, 92], r: [0.34, 0.48], m: 0.9, name: 'Alumínio anodizado' },
+        'preto-fosco': { d: [27, 28, 30], l: [40, 41, 44], r: [0.58, 0.72], m: 0.55, name: 'Preto fosco (cerakote)' },
+        fde: { d: [128, 106, 78], l: [150, 128, 96], r: [0.55, 0.7], m: 0.2, name: 'FDE (cerakote)' },
+        oliva: { d: [62, 68, 44], l: [80, 87, 58], r: [0.55, 0.7], m: 0.2, name: 'Verde oliva (cerakote)' },
+      };
+      const q = pal[c];
+      return { key: `anodizado-${c}`, name: q.name, color: '#ffffff', metalness: q.m, roughness: 1, pattern: { kind: 'blackened', dark: q.d, light: q.l, rough: q.r, wear: w * 0.6, seed: 71 } };
+    }
     case 'bright':
       return { key: 'aco-claro', name: 'Aço níquel-boro', color: '#ffffff', metalness: 1, roughness: 1, pattern: { kind: 'brushed', dark: [150, 152, 156], light: [205, 207, 210], rough: [0.2, 0.32], wear: w * 0.5, seed: 72 } };
     case 'photo':
@@ -277,8 +293,8 @@ function sampler(p: Pattern) {
         break;
       }
       case 'polymer': {
-        const n = fbm(u, v, 64, 64, 2);
-        h = 0.5 + (n - 0.5) * 0.25;
+        const n = fbm(u, v, 160, 160, 2);
+        h = 0.5 + (n - 0.5) * 0.12;
         mix = 0.45 + (fbm2(u, v, 6, 6) - 0.5) * 0.15 + (n - 0.5) * 0.12;
         rough = 0.5 + n * 0.5;
         break;
