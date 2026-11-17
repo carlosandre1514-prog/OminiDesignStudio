@@ -92,6 +92,18 @@ _Última atualização: 2026-11-14 (Fase 4 — 3D Design Studio)_
 - Exportação .GLB/.GLTF (peças, materiais e texturas) e .OBJ; “Abrir no Estúdio 3D” cria um projeto editável. Detalhes em `docs/ARSENAL.md`.
 - Testes: 19 unitários (interpretador, silhueta, desgaste, camuflagem, navegação espacial, perfis) e e2e `e2e/arsenal.mjs` nos três perfis.
 
+### ✅ Estúdio de Texturas (módulo `texture-studio`)
+- Materiais PBR por camadas no navegador (Web Worker): conteúdo (cores/gradiente/imagem, rugosidade, metálico, relevo, emissivo) × máscara (padrão, pincel 2D e direto no 3D, texto/decalque, imagem, curvatura, altura), 8 modos de mesclagem de cor e 5 de altura.
+- 22 geradores procedurais sem emenda e 16 materiais prontos; prévia 3D com relevo real e prévia 2D por mapa.
+- Exporta cor, normal (OpenGL/DirectX), rugosidade, metálico, altura, AO, emissivo e ORM em 512–2048 px (ZIP ou Asset Library). Desfazer/refazer, salvamento automático, versões e nuvem. Detalhes em `docs/TEXTURAS.md`.
+
+### ✅ Armas em alta definição
+- Novos construtores hard-surface: extrusão chanfrada com furos (`bevelExtrude`, com limite automático de chanfro), deslocamento de contorno, torno de perfil fechado (peças ocas), retângulos arredondados.
+- **Fuzil AR-15 (HD)** (~14 mil triângulos, 39 malhas): receptores bipartidos com janela de ejeção real e ferrolho visível, Picatinny com fendas de 10 mm, guarda-mão M-LOK vazado, cano oco com estria, quebra-chamas A2 com fendas ou freio de boca, pinos, seletor, retém, botão do carregador, coronha M4, carregador curvo com nervuras (alumínio ou polímero com janela), ótica holográfica/red dot/LPVO ou miras rebatíveis.
+- **Pistola 9mm (HD)**: ferrolho com janela e boca reais, serrilhas, miras com pontos luminosos, armação com trilho e guarda-mato vazado, textura de empunhadura, gatilho com tecla de segurança, controles; lanterna e supressor opcionais.
+- Acabamentos padrão realistas por arma, desgaste de bordas só em quinas convexas (lascado), texturas de borracha pontilhada. O interpretador de texto usa os modelos HD para “fuzil/AR-15/M4/pistola/9mm”.
+- Texturas do Estúdio aplicáveis por parte da arma no Arsenal, nas exportações e no Estúdio 3D.
+
 ### ✅ Publicação
 - GitHub Pages via GitHub Actions (`.github/workflows/pages.yml`): testes + build no subcaminho `/OminiDesignStudio/` + deploy a cada push. Supabase do projeto configurado no build.
 - App preparado para subcaminho: rotas (`basename`), service worker e manifest com escopo relativo, ícones, links de e-mail do Supabase apontando para `<base>/account`, `404.html` para links diretos.

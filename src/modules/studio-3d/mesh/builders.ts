@@ -223,3 +223,164 @@ export function rng(seed: number) {
     pick: <T,>(list: T[]) => list[Math.floor(next() * list.length)],
   };
 }
+
+// ---------------------------------------------------------------- hard-surface builders
+
+const signedArea2 = (pts: V2[]) => pts.reduce((s, [x, y], i) => {
+  const [x2, y2] = pts[(i + 1) % pts.length];
+  return s + x * y2 - x2 * y;
+}, 0) / 2;
+
+/**
+ * Offset a closed polygon toward its own interior by `d` (negative = outward), with mitred corners
+ * (miter length capped at 3·d so sharp tips don't explode). Works for either winding.
+ */
+export function offsetPolygon(pts: V2[], d: number): V2[] {
+  if (Math.abs(d) < 1e-9) return pts.map((p) => [...p] as V2);
+  const s = signedArea2(pts) >= 0 ? 1 : -1;
+  const n = pts.length;
+  const normal = (a: V2, b: V2): V2 => {
+    const dx = b[0] - a[0];
+    const dy = b[1] - a[1];
+    const l = Math.hypot(dx, dy) || 1e-9;
+    return [(-dy / l) * s, (dx / l) * s];
+  };
+  return pts.map((p, i) => {
+    const n1 = normal(pts[(i - 1 + n) % n], p);
+    const n2 = normal(p, pts[(i + 1) % n]);
+    let mx = n1[0] + n2[0];
+    let my = n1[1] + n2[1];
+    const ml = Math.hypot(mx, my);
+    if (ml < 1e-6) {
+      mx = n1[0];
+      my = n1[1];
+    } else {
+      mx /= ml;
+      my /= ml;
+    }
+    const cos = mx * n1[0] + my * n1[1];
+    const len = Math.min(Math.abs(d) * 3, Math.abs(d) / Math.max(0.2, cos)) * Math.sign(d);
+    return [p[0] + mx * len, p[1] + my * len] as V2;
+  });
+}
+
+/**
+ * Extrusion with rounded (bevelled) edges on both caps — the key ingredient of realistic hard-surface
+ * parts: every edge catches a highlight instead of being razor sharp. Holes are bevelled too.
+ * `segments` = 1 gives a chamfer, 2–3 a rounded fillet.
+ */
+const segDist = (p: V2, a: V2, b: V2) => {
+  const dx = b[0] - a[0];
+  const dy = b[1] - a[1];
+  const t = Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / (dx * dx + dy * dy || 1e-12)));
+  return Math.hypot(p[0] - a[0] - t * dx, p[1] - a[1] - t * dy);
+};
+/** Smallest distance between a vertex of one loop and the edges of another (wall thickness around holes). */
+const loopGap = (a: V2[], b: V2[]) => {
+  let m = Infinity;
+  for (const p of a) for (let i = 0; i < b.length; i++) m = Math.min(m, segDist(p, b[i], b[(i + 1) % b.length]));
+  for (const p of b) for (let i = 0; i < a.length; i++) m = Math.min(m, segDist(p, a[i], a[(i + 1) % a.length]));
+  return m;
+};
+
+export function bevelExtrude(outline: V2[], depth: number, bevel: number, holes: V2[][] = [], segments = 2): P.PolyMesh {
+  let b = Math.max(0, Math.min(bevel, depth * 0.45));
+  // Never let bevels of neighbouring loops (outline ↔ hole, hole ↔ hole) cross each other.
+  const loops0 = [outline, ...holes];
+  for (let i = 0; i < loops0.length; i++) for (let j = i + 1; j < loops0.length; j++) b = Math.min(b, loopGap(loops0[i], loops0[j]) * 0.4);
+  if (b < 1e-6) return extrude(outline, depth, holes);
+  const ccw = (pts: V2[]) => (signedArea2(pts) < 0 ? [...pts].reverse() : pts);
+  const outer = ccw(outline);
+  const inner = holes.map((h) => [...ccw(h)].reverse());
+  const loops = [outer, ...inner];
+  const seg = Math.max(1, Math.round(segments));
+  // profile: back cap edge → back fillet → front fillet → front cap edge
+  const prof: { inset: number; z: number }[] = [];
+  for (let k = 0; k <= seg; k++) {
+    const a = (k / seg) * (Math.PI / 2);
+    prof.push({ inset: b * (1 - Math.sin(a)), z: -depth / 2 + b * (1 - Math.cos(a)) });
+  }
+  for (let k = seg; k >= 0; k--) {
+    const a = (k / seg) * (Math.PI / 2);
+    prof.push({ inset: b * (1 - Math.sin(a)), z: depth / 2 - b * (1 - Math.cos(a)) });
+  }
+  const v: number[] = [];
+  // rings[loop][profileStep] = vertex ids
+  const rings = loops.map((loop, li) =>
+    prof.map(({ inset, z }) => {
+      // outer loop shrinks inward, holes grow into the material
+      const pts = offsetPolygon(loop, li === 0 ? inset : -inset);
+      return pts.map(([x, y]) => (v.push(x, y, z), v.length / 3 - 1));
+    }),
+  );
+  const f: number[][] = [];
+  rings.forEach((rs) => {
+    for (let r = 0; r < rs.length - 1; r++) {
+      const a = rs[r];
+      const c = rs[r + 1];
+      for (let i = 0; i < a.length; i++) {
+        const j = (i + 1) % a.length;
+        f.push([a[i], a[j], c[j], c[i]]);
+      }
+    }
+  });
+  const capOuter = offsetPolygon(outer, b);
+  const capHoles = inner.map((h) => offsetPolygon(h, -b));
+  const tris = THREE.ShapeUtils.triangulateShape(
+    capOuter.map(([x, y]) => new THREE.Vector2(x, y)),
+    capHoles.map((h) => h.map(([x, y]) => new THREE.Vector2(x, y))),
+  );
+  const back = rings.flatMap((rs) => rs[0]);
+  const front = rings.flatMap((rs) => rs[rs.length - 1]);
+  for (const [a, bb, c] of tris) {
+    f.push([back[c], back[bb], back[a]]);
+    f.push([front[a], front[bb], front[c]]);
+  }
+  return orientOutward({ v, f });
+}
+
+/** Revolve a closed profile ([radius, y] loop, all radii > 0) around Y: rings, muzzle devices, hollow tubes. */
+export function latheLoop(profile: V2[], segments = 24): P.PolyMesh {
+  const n = Math.max(3, Math.round(segments));
+  const v: number[] = [];
+  const rings = profile.map(([r, y]) => {
+    const ids: number[] = [];
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2;
+      v.push(Math.cos(a) * r, y, -Math.sin(a) * r);
+      ids.push(v.length / 3 - 1);
+    }
+    return ids;
+  });
+  const f: number[][] = [];
+  for (let k = 0; k < rings.length; k++) {
+    const lo = rings[k];
+    const up = rings[(k + 1) % rings.length];
+    for (let i = 0; i < n; i++) {
+      const j = (i + 1) % n;
+      f.push([lo[i], lo[j], up[j], up[i]]);
+    }
+  }
+  return orientOutward({ v, f });
+}
+
+/** Rounded-rectangle outline (2D), handy for slots, buttons and plates. */
+export function roundedRect(w: number, h: number, r: number, steps = 4, cx = 0, cy = 0): V2[] {
+  const rr = Math.min(r, w / 2 - 1e-6, h / 2 - 1e-6);
+  const pts: V2[] = [];
+  const corners: [number, number, number][] = [
+    [w / 2 - rr, h / 2 - rr, 0],
+    [-(w / 2 - rr), h / 2 - rr, Math.PI / 2],
+    [-(w / 2 - rr), -(h / 2 - rr), Math.PI],
+    [w / 2 - rr, -(h / 2 - rr), (3 * Math.PI) / 2],
+  ];
+  for (const [x, y, a0] of corners)
+    for (let k = 0; k <= steps; k++) {
+      const a = a0 + (k / steps) * (Math.PI / 2);
+      pts.push([cx + x + Math.cos(a) * rr, cy + y + Math.sin(a) * rr]);
+    }
+  return pts;
+}
+
+/** Circle outline (2D). */
+export const circle = (r: number, steps = 24, cx = 0, cy = 0): V2[] => Array.from({ length: steps }, (_, i) => [cx + Math.cos((i / steps) * Math.PI * 2) * r, cy + Math.sin((i / steps) * Math.PI * 2) * r] as V2);

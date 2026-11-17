@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState, type KeyboardEvent as ReactKe
 import { ArsenalCanvas, type CameraApi } from './canvas/ArsenalCanvas';
 import { ExportBar } from './components/ExportBar';
 import { Header } from './components/Header';
-import { MaterialsPanel } from './components/MaterialsPanel';
+import { MaterialsPanel, StudioTexturesPanel } from './components/MaterialsPanel';
 import { PartsInspector } from './components/PartsInspector';
 import { ModelPanel, PromptPanel } from './components/PromptPanel';
 import { Btn, FOCUS, ProfileContext } from './components/ui';
@@ -118,7 +118,12 @@ function TabPanels({ tab }: { tab: Tab }) {
         </>
       )}
       {tab === 'pecas' && <PartsInspector />}
-      {tab === 'materiais' && <MaterialsPanel />}
+      {tab === 'materiais' && (
+        <>
+          <MaterialsPanel />
+          <StudioTexturesPanel />
+        </>
+      )}
       {tab === 'exportar' && (
         <div className="p-4">
           <ExportBar compact />
@@ -240,6 +245,7 @@ export default function ArsenalApp() {
         <aside className="min-h-0 overflow-y-auto border-l border-white/10 bg-[#10141a]" aria-label="Inspector">
           <PartsInspector />
           <MaterialsPanel />
+          <StudioTexturesPanel />
         </aside>
       </div>
     </Shell>

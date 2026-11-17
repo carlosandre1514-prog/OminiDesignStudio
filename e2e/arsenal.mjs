@@ -60,6 +60,7 @@ const tris = async (page) => Number((await page.getByTestId('arsenal-tris').inne
   const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, acceptDownloads: true });
   const page = await ctx.newPage();
   watch(page, 'pc');
+  page.on('dialog', (d) => d.accept());
   await page.goto(`${BASE}/`);
   await page.getByTestId('open-arsenal').click();
   await page.waitForURL(/arsenal/);
@@ -81,7 +82,8 @@ const tris = async (page) => Number((await page.getByTestId('arsenal-tris').inne
   // ---- example prompt (the one from the brief)
   await page.getByTestId('arsenal-prompt').fill('Fuzil de assalto tático cal. 5.56 com acabamento cerakote preto fosco e mira holográfica');
   await page.getByTestId('arsenal-generate').click();
-  assert(await until(async () => (await page.getByTestId('arsenal-model-name').innerText()) === 'Fuzil de assalto' && /Red dot/.test(await page.getByTestId('arsenal-understood').innerText())), 'PC: prompt de exemplo → fuzil com mira holográfica');
+  assert(await until(async () => (await page.getByTestId('arsenal-model-name').innerText()) === 'Fuzil AR-15 (HD)' && /Holográfica/.test(await page.getByTestId('arsenal-understood').innerText())), 'PC: prompt de exemplo → AR-15 HD com mira holográfica');
+  assert(await until(async () => (await tris(page)) > 8000), `PC: modelo HD com alto detalhe (${await tris(page)} triângulos)`);
   await page.waitForTimeout(600);
 
   // ---- modular inspector
@@ -151,9 +153,42 @@ const tris = async (page) => Number((await page.getByTestId('arsenal-tris').inne
     await page.getByRole('button', { name: 'Fuzil de assalto', exact: true }).click();
   });
   assert(await until(async () => (await page.getByTestId('arsenal-model-name').innerText()) === 'Fuzil de assalto'), 'PC: volta ao modelo procedural pelo seletor de tipo');
+  // ---- Texture Studio material applied to the weapon
+  await page.goto(`${BASE}/`);
+  await page.getByTestId('new-texture').click();
+  await page.waitForURL(/texture-studio/);
+  await page.getByTestId('texture-studio').waitFor();
+  await page.getByLabel('Material pronto').selectOption('woodland');
+  assert(await until(async () => /Salvo/.test(await page.getByTestId('tex-status').innerText()), 20000), 'PC: textura camuflada criada e salva no Estúdio de Texturas');
+  await page.goto(`${BASE}/arsenal`);
+  assert(await until(async () => (await snap(page)).cov > 0.03), 'PC: Arsenal reabre com o AR-15 HD');
+  await page.waitForTimeout(1500);
+  const t0s = await snap(page);
+  const slotGroup = page.getByRole('group', { name: 'Alumínio (receptores)' });
+  await slotGroup.getByRole('button', { name: 'Nova textura' }).first().click();
+  assert(await until(async () => changed(t0s, await snap(page)) > 0.02 && /Pronto/.test(await statusText(page)), 30000), 'PC: textura do Estúdio aplicada nos receptores');
+  const green = await page.evaluate(() => {
+    const c = document.querySelector('[data-testid="arsenal-viewport"] canvas');
+    const t = document.createElement('canvas');
+    t.width = 128;
+    t.height = 128;
+    const g = t.getContext('2d');
+    g.drawImage(c, 0, 0, 128, 128);
+    const d = g.getImageData(0, 0, 128, 128).data;
+    let n = 0;
+    for (let i = 0; i < d.length; i += 4) if (d[i + 1] > d[i] + 8 && d[i + 1] > d[i + 2] + 4) n++;
+    return n;
+  });
+  assert(green > 40, `PC: camuflagem woodland visível na arma (${green} pixels verdes)`);
+  if (SHOTS) await page.screenshot({ path: `${SHOTS}/arsenal-studio-texture.png` });
   await page.getByTestId('arsenal-to-studio').click();
-  await page.waitForURL(/3d-studio/, { timeout: 30000 });
-  assert(await until(() => page.getByTestId('outliner').getByText('Fuzil de assalto').isVisible(), 20000), 'PC: "Abrir no Estúdio 3D" cria projeto com a arma editável');
+  const tStudio = Date.now();
+  await page.waitForURL(/3d-studio/, { timeout: 120000 }).catch(async (e) => {
+    console.log('toasts:', await page.locator('[role=status], [role=alert]').allInnerTexts());
+    throw e;
+  });
+  console.log(`  (projeto criado em ${((Date.now() - tStudio) / 1000).toFixed(1)} s)`);
+  assert(await until(() => page.getByTestId('outliner').getByText('Fuzil AR-15 (HD)').isVisible(), 30000), 'PC: "Abrir no Estúdio 3D" cria projeto com a arma editável (com as texturas do estúdio)');
   await ctx.close();
 }
 

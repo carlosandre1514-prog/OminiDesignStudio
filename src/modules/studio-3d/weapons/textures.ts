@@ -101,6 +101,12 @@ export function materialFor(slot: Slot, f: Finish): MaterialSpec {
       const [dark, light] = pal[f.polymer];
       return { key: `polymer-${f.polymer}`, name: `Polímero ${FINISH_LABELS.polymer.options[f.polymer].toLowerCase()}`, color: '#ffffff', metalness: 0, roughness: 1, pattern: { kind: 'polymer', dark, light, rough: [0.55, 0.8], wear: w, seed: 61 } };
     }
+    case 'anodized':
+      return { key: 'anodizado', name: 'Alumínio anodizado', color: '#ffffff', metalness: 0.9, roughness: 1, pattern: { kind: 'blackened', dark: [26, 27, 30], light: [52, 54, 58], rough: [0.42, 0.55], wear: w * 0.6, seed: 71 } };
+    case 'bright':
+      return { key: 'aco-claro', name: 'Aço níquel-boro', color: '#ffffff', metalness: 1, roughness: 1, pattern: { kind: 'brushed', dark: [150, 152, 156], light: [205, 207, 210], rough: [0.2, 0.32], wear: w * 0.5, seed: 72 } };
+    case 'lens':
+      return { key: 'lente', name: 'Lente', color: '#8fb8cc', metalness: 0, roughness: 0.04, opacity: 0.3 };
     case 'string':
       return { key: 'string', name: 'Corda encerada', color: '#d9cdb0', metalness: 0, roughness: 0.7 };
     case 'fletch':
@@ -192,6 +198,7 @@ function sampler(p: Pattern) {
   const fbm2 = makeFbm(p.seed + 7);
   const cells = makeCells(p.seed + 3, 12);
   const big = makeCells(p.seed + 5, 5);
+  const fine = makeCells(p.seed + 9, 72);
   return (u: number, v: number): { h: number; mix: number; rough: number; dirt: number } => {
     const grime = clamp01((fbm2(u, v, 3, 3) - 0.55) * 3) * p.wear;
     let h = 0.5;
@@ -216,9 +223,9 @@ function sampler(p: Pattern) {
       }
       case 'blackened': {
         const n = fbm(u, v, 8, 8);
-        mix = n * 0.6 + fbm2(u, v, 32, 32, 2) * 0.4;
-        h = 0.5 + (fbm(u, v, 32, 32, 2) - 0.5) * 0.15;
-        rough = mix;
+        mix = n * 0.7 + fbm2(u, v, 32, 32, 2) * 0.3;
+        h = 0.5 + (fbm(u, v, 48, 48, 2) - 0.5) * 0.05;
+        rough = 0.35 + mix * 0.65;
         break;
       }
       case 'hammered': {
@@ -259,9 +266,10 @@ function sampler(p: Pattern) {
         break;
       }
       case 'rubber': {
-        const c = cells(u * 1, v * 1);
-        const stipple = c < 0.45 ? 1 : 0;
-        h = 0.4 + stipple * 0.4 + fbm(u, v, 64, 64, 2) * 0.2;
+        // fine stippling (~1 mm dimples at the default 25 cm tile)
+        const c = fine(u, v);
+        const stipple = 1 - Math.min(1, c * 1.6);
+        h = 0.35 + stipple * 0.45 + fbm(u, v, 64, 64, 2) * 0.2;
         mix = 0.4 + stipple * 0.2;
         rough = 0.8;
         break;

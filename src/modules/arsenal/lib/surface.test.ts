@@ -24,6 +24,25 @@ describe('edge wear attributes', () => {
     }
   });
 
+  it('concave corners are not wear edges', async () => {
+    const { extrude } = await import('@/modules/studio-3d/mesh/builders');
+    // L-shaped block: one concave (inner) vertical edge, five convex ones on the outline
+    const L = extrude([[0, 0], [2, 0], [2, 1], [1, 1], [1, 2], [0, 2]], 1);
+    const { edgeH } = edgeWearAttributes(L);
+    expect(Array.from(edgeH).some((x) => x > 0)).toBe(true);
+    // the inner corner sits at x = y = 1; no triangle adjacent to it may flag the vertical inner edge
+    const pos = toBufferGeometry(L, { shading: 'auto', uv: 'box' }).getAttribute('position');
+    for (let t = 0; t < pos.count / 3; t++) {
+      const pts = [0, 1, 2].map((c) => [pos.getX(t * 3 + c), pos.getY(t * 3 + c)]);
+      for (let i = 0; i < 3; i++) {
+        const a = pts[(i + 1) % 3];
+        const b = pts[(i + 2) % 3];
+        const inner = Math.abs(a[0] - 1) < 1e-6 && Math.abs(a[1] - 1) < 1e-6 && Math.abs(b[0] - 1) < 1e-6 && Math.abs(b[1] - 1) < 1e-6;
+        if (inner) expect(edgeH[t * 9 + i]).toBeLessThan(0);
+      }
+    }
+  });
+
   it('a flat subdivided plane has no hard edges inside, only its open border', () => {
     const { edgeH } = edgeWearAttributes(P.plane(1, 1, 4, 4));
     const hardCount = Array.from(edgeH).filter((x) => x > 0).length / 3;

@@ -4,12 +4,14 @@ import { normalize, parsePrompt } from './promptParser';
 describe('parsePrompt (local text-to-3D)', () => {
   it('reads the example prompt', () => {
     const r = parsePrompt('Fuzil de assalto tático cal. 5.56 com acabamento cerakote preto fosco e mira holográfica');
-    expect(r.weapon.id).toBe('assault-rifle');
-    expect(r.params.optic).toBe('reddot');
+    expect(r.weapon.id).toBe('ar15-hd');
+    expect(r.params.optic).toBe('holo');
     expect(r.finish.polymer).toBe('preto');
     expect(r.finish.steel).toBe('escuro');
     expect(r.camo?.pattern).toBe('solido');
-    expect(r.understood.join(' ')).toMatch(/Red dot/);
+    expect(r.understood.join(' ')).toMatch(/Holográfica/);
+    expect(parsePrompt('AK-47 com carregador tambor').weapon.id).toBe('assault-rifle');
+    expect(parsePrompt('M4 com red dot, PMAG e freio de boca').params).toMatchObject({ optic: 'reddot', mag: 'polimero', muzzle: 'freio' });
   });
 
   it('detects types, attachments, size, wear and camo', () => {

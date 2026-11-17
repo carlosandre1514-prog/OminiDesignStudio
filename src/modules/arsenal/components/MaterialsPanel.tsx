@@ -1,10 +1,15 @@
-import { Palette } from 'lucide-react';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { Layers3, Palette, Plus } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { createProject } from '@/core/projects/projectService';
+import type { Slot } from '@/modules/studio-3d/weapons/catalog';
 import { useShallow } from 'zustand/react/shallow';
 import { FINISH_LABELS, type Finish } from '@/modules/studio-3d/weapons/textures';
 import { CAMO_LABELS, CAMO_PALETTES } from '../lib/surface';
 import type { CamoPattern } from '../lib/promptParser';
 import { useArsenal } from '../store';
-import { FOCUS, Section, Segmented, Slider, useProfile } from './ui';
+import { listTextureProjects, SLOT_LABELS } from '../lib/textureLink';
+import { Btn, FOCUS, Section, Segmented, Slider, useProfile } from './ui';
 
 const SWATCHES = ['#1d1f22', '#3a3d41', '#4e5634', '#9c8364', '#5a3a2a', '#2f3e55', '#7a1f1f', '#d8d8d2'];
 const pct = (v: number) => `${Math.round(v * 100)}%`;
@@ -65,6 +70,50 @@ export function MaterialsPanel() {
           );
         })}
       <Slider label="Desgaste das texturas (arranhões, sujeira)" value={finish.wear} min={0} max={1} step={0.05} format={pct} onChange={(v) => st().setFinish({ wear: v })} />
+    </Section>
+  );
+}
+
+/**
+ * Apply materials authored in the Texture Studio to the weapon's material slots
+ * (receivers, polymer, steel, grip…). Textures tile at a real scale set by the slider.
+ */
+export function StudioTexturesPanel() {
+  const navigate = useNavigate();
+  const parts = useArsenal((s) => s.parts);
+  const custom = useArsenal((s) => s.custom);
+  const customScale = useArsenal((s) => s.customScale);
+  const projects = useLiveQuery(() => listTextureProjects(), []) ?? [];
+  const slots = [...new Set(parts.map((p) => p.slot))].filter((sl): sl is Slot => !!SLOT_LABELS[sl]);
+  const st = useArsenal.getState;
+  const newTexture = async () => {
+    const { docFromPreset } = await import('@/modules/texture-studio/engine/presets');
+    const meta = await createProject({ name: 'Textura para arma', category: '3d', modules: { 'texture-studio': docFromPreset('cerakote-black', 'Textura para arma') }, tags: ['textura'] });
+    navigate(`/project/${meta.id}/texture-studio`);
+  };
+  return (
+    <Section title="Texturas do Estúdio" icon={<Layers3 size={16} />} right={<Btn variant="ghost" onClick={newTexture} data-testid="arsenal-new-texture"><Plus size={14} /> Criar</Btn>}>
+      {projects.length === 0 ? (
+        <p className="text-xs text-zinc-400">Crie materiais no Estúdio de Texturas (camadas, pintura, gravações, desgaste) e aplique aqui em cada parte da arma.</p>
+      ) : (
+        <>
+          {slots.map((slot) => (
+            <Segmented
+              key={slot}
+              label={SLOT_LABELS[slot]!}
+              value={custom[slot]?.id ?? ''}
+              options={[{ id: '', label: 'Padrão' }, ...projects.map((p) => ({ id: p.id, label: p.name }))]}
+              onChange={(id) => {
+                const next = { ...st().custom };
+                if (!id) delete next[slot];
+                else next[slot] = { id, name: projects.find((p) => p.id === id)!.name };
+                st().set({ custom: next });
+              }}
+            />
+          ))}
+          <Slider label="Escala da textura" value={customScale} min={2} max={40} step={1} format={(v) => `${Math.round(100 / v)} cm por repetição`} onChange={(v) => st().set({ customScale: v })} />
+        </>
+      )}
     </Section>
   );
 }

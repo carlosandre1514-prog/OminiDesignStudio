@@ -2,13 +2,14 @@ import { useEffect, useMemo } from 'react';
 import * as THREE from 'three';
 import type { Slot } from '@/modules/studio-3d/weapons/catalog';
 import { materialFor, texturesFor, type Finish, type MaterialSpec, type TextureSet } from '@/modules/studio-3d/weapons/textures';
+import type { TextureMaps } from '@/modules/texture-studio/engine/compose';
 import type { CamoPattern } from '../lib/promptParser';
 import { applyEdgeWear, camouflage, createWearUniforms, type WearUniforms } from '../lib/surface';
 
 /** Texture tile: 25 cm (UVs are in metres with box projection). */
 export const UV_REPEAT = 4;
 /** Slots that receive the camouflage / cerakote coating. */
-export const COATED: Slot[] = ['polymer', 'dark'];
+export const COATED: Slot[] = ['polymer', 'dark', 'anodized'];
 
 /** What shows through on worn edges for each slot. */
 const WEAR_KIND: Partial<Record<Slot, 'metal' | 'polymer' | 'wood'>> = {
@@ -17,6 +18,7 @@ const WEAR_KIND: Partial<Record<Slot, 'metal' | 'polymer' | 'wood'>> = {
   metal: 'metal',
   blade: 'metal',
   trim: 'metal',
+  anodized: 'metal',
   wood: 'wood',
 };
 
@@ -28,6 +30,29 @@ export interface SurfaceSettings {
   metalness: number;
   /** rotate textures 90° for weapons modelled along X (grain/brushing follows the length) */
   horizontal: boolean;
+  /** Texture Studio maps applied to slots (override the procedural finish). */
+  custom?: Partial<Record<Slot, TextureMaps>>;
+  /** Repeats per metre for custom textures. */
+  customScale?: number;
+}
+
+/** DataTexture from studio maps; rows flipped so the image top maps to v = 1. */
+function studioTexture(data: Uint8ClampedArray, size: number, srgb: boolean, repeat: number, horizontal: boolean) {
+  const flipped = new Uint8Array(data.length);
+  const row = size * 4;
+  for (let y = 0; y < size; y++) flipped.set(data.subarray(y * row, y * row + row), (size - 1 - y) * row);
+  const t = new THREE.DataTexture(flipped, size, size, THREE.RGBAFormat);
+  t.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace;
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(repeat, repeat);
+  t.center.set(0.5, 0.5);
+  t.rotation = horizontal ? Math.PI / 2 : 0;
+  t.magFilter = THREE.LinearFilter;
+  t.minFilter = THREE.LinearMipmapLinearFilter;
+  t.generateMipmaps = true;
+  t.anisotropy = 8;
+  t.needsUpdate = true;
+  return t;
 }
 
 export function dataTexture(rgba: Uint8ClampedArray, size: number, srgb: boolean, horizontal: boolean) {
@@ -67,9 +92,10 @@ export const slotKey = (slot: Slot, s: Pick<SurfaceSettings, 'finish' | 'camo'>)
 export function useWeaponMaterials(slots: Slot[], s: SurfaceSettings) {
   const uniforms = useMemo(() => ({ metal: createWearUniforms(), polymer: createWearUniforms(), wood: createWearUniforms() }), []);
   useMemo(() => {
-    uniforms.metal.uBare.value.set('#c4c8ce');
+    // Subtle: worn coatings reveal grey steel/aluminium, not chrome.
+    uniforms.metal.uBare.value.set('#8f949b');
     uniforms.metal.uBareMetal.value = 1;
-    uniforms.polymer.uBare.value.set('#8e8d86');
+    uniforms.polymer.uBare.value.set('#4a4a48');
     uniforms.polymer.uBareMetal.value = 0;
     uniforms.wood.uBare.value.set('#c9a27a');
     uniforms.wood.uBareMetal.value = 0;
@@ -93,8 +119,25 @@ export function useWeaponMaterials(slots: Slot[], s: SurfaceSettings) {
         m.transparent = true;
         m.opacity = spec.opacity;
       }
-      const tex = slotTextures(slot, spec, s);
-      if (tex) {
+      const studio = s.custom?.[slot];
+      const tex = studio ? null : slotTextures(slot, spec, s);
+      if (studio) {
+        const rep = s.customScale ?? 8;
+        m.color.set('#ffffff');
+        m.metalness = 1;
+        m.roughness = 1;
+        m.userData.spec = { ...spec, metalness: 1, roughness: 1 };
+        m.map = studioTexture(studio.baseColor, studio.size, true, rep, s.horizontal);
+        m.roughnessMap = studioTexture(studio.roughness, studio.size, false, rep, s.horizontal);
+        m.metalnessMap = studioTexture(studio.metallic, studio.size, false, rep, s.horizontal);
+        m.normalMap = studioTexture(studio.normal, studio.size, false, rep, s.horizontal);
+        m.aoMap = studioTexture(studio.ao, studio.size, false, rep, s.horizontal);
+        m.aoMap.channel = 0;
+        m.emissiveMap = studioTexture(studio.emissive, studio.size, true, rep, s.horizontal);
+        m.emissive.set('#ffffff');
+        m.emissiveIntensity = 1.5;
+        m.name = `${spec.name} (Estúdio de Texturas)`;
+      } else if (tex) {
         m.map = dataTexture(tex.color, tex.size, true, s.horizontal);
         m.roughnessMap = dataTexture(tex.roughness, tex.size, false, s.horizontal);
         m.normalMap = dataTexture(tex.normal, tex.size, false, s.horizontal);
@@ -107,12 +150,12 @@ export function useWeaponMaterials(slots: Slot[], s: SurfaceSettings) {
     }
     return map;
     // eslint-disable-next-line react-hooks/exhaustive-deps -- finish/coat captured via keys
-  }, [slotList, JSON.stringify(s.finish), coatKey, s.horizontal, uniforms]);
+  }, [slotList, JSON.stringify(s.finish), coatKey, s.horizontal, uniforms, s.custom, s.customScale]);
 
   useEffect(
     () => () =>
       materials.forEach((m) => {
-        for (const t of [m.map, m.roughnessMap, m.normalMap]) t?.dispose();
+        for (const t of [m.map, m.roughnessMap, m.normalMap, m.metalnessMap, m.aoMap, m.emissiveMap]) t?.dispose();
         m.dispose();
       }),
     [materials],

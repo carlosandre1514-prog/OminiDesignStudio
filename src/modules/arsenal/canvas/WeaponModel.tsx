@@ -1,13 +1,43 @@
 import { Edges } from '@react-three/drei';
 import { useFrame, type ThreeEvent } from '@react-three/fiber';
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { toBufferGeometry } from '@/modules/studio-3d/geometry';
 import { useShallow } from 'zustand/react/shallow';
 import { isHorizontal } from '@/modules/studio-3d/weapons/assemble';
+import type { TextureMaps } from '@/modules/texture-studio/engine/compose';
+import type { Slot } from '@/modules/studio-3d/weapons/catalog';
 import { edgeWearAttributes } from '../lib/surface';
+import { textureProjectMaps } from '../lib/textureLink';
 import { partVisible, useArsenal, weaponById } from '../store';
 import { useWeaponMaterials } from './useWeaponMaterials';
+
+/** Evaluate the Texture Studio projects assigned to slots (async, cached per project version). */
+function useCustomMaps(custom: Partial<Record<Slot, { id: string }>>) {
+  const [maps, setMaps] = useState<Partial<Record<Slot, TextureMaps>>>({});
+  const key = JSON.stringify(custom);
+  useEffect(() => {
+    let alive = true;
+    const entries = Object.entries(custom) as [Slot, { id: string }][];
+    if (!entries.length) {
+      setMaps({});
+      return;
+    }
+    useArsenal.getState().set({ status: { kind: 'busy', text: 'Aplicando texturas do estúdio…' } });
+    Promise.all(entries.map(async ([slot, c]) => [slot, await textureProjectMaps(c.id)] as const))
+      .then((list) => {
+        if (!alive) return;
+        setMaps(Object.fromEntries(list));
+        useArsenal.getState().set({ status: { kind: 'ready', text: 'Pronto' } });
+      })
+      .catch((e) => alive && useArsenal.getState().set({ status: { kind: 'error', text: e instanceof Error ? e.message : 'Falha ao carregar textura' } }));
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
+  return maps;
+}
 
 /** The group that is exported (GLB/GLTF/OBJ) — set while the model is mounted. */
 export const exportRoot: { current: THREE.Group | null } = { current: null };
@@ -21,7 +51,10 @@ export function WeaponModel() {
     useShallow((s) => ({ parts: s.parts, finish: s.finish, camo: s.camo, edgeWear: s.edgeWear, roughness: s.roughness, metalness: s.metalness, explode: s.explode, selected: s.selected, hidden: s.hidden, solo: s.solo, weaponId: s.weaponId, source: s.source })),
   );
   const horizontal = source === 'image' || isHorizontal(weaponById(weaponId));
-  const materials = useWeaponMaterials(parts.map((p) => p.slot), { finish, camo, edgeWear, roughness, metalness, horizontal });
+  const custom = useArsenal((s) => s.custom);
+  const customScale = useArsenal((s) => s.customScale);
+  const customMaps = useCustomMaps(custom);
+  const materials = useWeaponMaterials(parts.map((p) => p.slot), { finish, camo, edgeWear, roughness, metalness, horizontal, custom: customMaps, customScale });
 
   const model = useMemo(() => {
     const items = parts.map((p) => {

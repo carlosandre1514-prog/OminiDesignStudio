@@ -53,8 +53,10 @@ const TYPE_RULES: [string, string[]][] = [
   ['sniper', ['rifle de precisao', 'sniper', 'atirador', 'ferrolho', 'bolt action', 'precisao']],
   ['smg', ['submetralhadora', 'smg', 'mp5', 'uzi', 'pdw']],
   ['shotgun', ['espingarda', 'escopeta', 'shotgun', 'pump', 'calibre 12', 'cal 12', 'cal. 12']],
-  ['assault-rifle', ['fuzil de assalto', 'fuzil', 'rifle de assalto', 'assault rifle', 'ar-15', 'ar15', 'm4', 'm16', 'ak', 'ak-47', 'ak47', 'carabina', 'rifle']],
-  ['pistol', ['pistola', 'pistol', 'glock', 'handgun', 'revolver']],
+  ['assault-rifle', ['ak', 'ak-47', 'ak47', 'kalashnikov', 'fuzil simples', 'low poly']],
+  ['ar15-hd', ['fuzil de assalto', 'fuzil', 'rifle de assalto', 'assault rifle', 'ar-15', 'ar15', 'm4', 'm16', 'carabina', 'rifle']],
+  ['pistol', ['pistola simples', 'revolver']],
+  ['pistol-hd', ['pistola', 'pistol', 'glock', 'handgun', '9mm', 'arma curta']],
   ['crossbow', ['besta', 'crossbow']],
   ['recurve-bow', ['arco recurvo', 'recurve']],
   ['longbow', ['arco longo', 'longbow']],
@@ -68,7 +70,8 @@ const TYPE_RULES: [string, string[]][] = [
   ['longsword', ['espada longa', 'espada', 'sword', 'montante']],
 ];
 
-const OPTIC_REDDOT = ['mira holografica', 'holografica', 'red dot', 'reddot', 'ponto vermelho', 'holo'];
+const OPTIC_HOLO = ['mira holografica', 'holografica', 'holo', 'eotech'];
+const OPTIC_REDDOT = ['red dot', 'reddot', 'ponto vermelho', 'aimpoint'];
 const OPTIC_SCOPE = ['luneta', 'scope', 'mira telescopica', 'telescopica de mira', 'acog'];
 
 interface Ctx {
@@ -109,25 +112,30 @@ export function parsePrompt(prompt: string, fallbackId = 'assault-rifle'): Promp
       typeFound = true;
       break;
     }
-  const c: Ctx = { t, w: weapon, p: defaultParams(weapon), f: { ...DEFAULT_FINISH }, out: [`Tipo: ${weapon.name}${typeFound ? '' : ' (padrão)'}`] };
+  const c: Ctx = { t, w: weapon, p: defaultParams(weapon), f: { ...DEFAULT_FINISH, ...weapon.finish }, out: [`Tipo: ${weapon.name}${typeFound ? '' : ' (padrão)'}`] };
   let camo: PromptResult['camo'];
 
   // ---- attachments / shape
-  if (has(t, ...OPTIC_REDDOT)) setChoice(c, 'optic', 'reddot') || setChoice(c, 'scope', 'sim');
+  if (has(t, ...OPTIC_HOLO)) setChoice(c, 'optic', 'holo') || setChoice(c, 'optic', 'reddot') || setChoice(c, 'scope', 'sim');
+  else if (has(t, ...OPTIC_REDDOT)) setChoice(c, 'optic', 'reddot') || setChoice(c, 'scope', 'sim');
   else if (has(t, ...OPTIC_SCOPE)) setChoice(c, 'optic', 'luneta') || setChoice(c, 'scope', 'sim');
-  else if (has(t, 'sem mira', 'sem otica', 'iron sights', 'massa de mira')) setChoice(c, 'optic', 'nenhuma');
+  else if (has(t, 'miras mecanicas', 'mira mecanica', 'iron sights', 'massa de mira', 'buis')) setChoice(c, 'optic', 'iron') || setChoice(c, 'optic', 'nenhuma');
+  else if (has(t, 'sem mira', 'sem otica')) setChoice(c, 'optic', 'nenhuma');
   if (has(t, 'supressor', 'silenciador', 'suppressor', 'silencer', 'suprimido')) setChoice(c, 'suppressor', 'sim');
   if (has(t, 'lanterna', 'flashlight', 'luz tatica')) setChoice(c, 'light', 'sim');
   if (has(t, 'bipe', 'bipod')) setChoice(c, 'bipod', 'sim');
   if (has(t, 'empunhadura frontal', 'foregrip', 'grip vertical')) setChoice(c, 'foregrip', 'sim');
-  if (has(t, 'tambor', 'drum')) setChoice(c, 'mag', 'tambor');
+  if (has(t, 'pmag', 'carregador de polimero', 'magazine de polimero')) setChoice(c, 'mag', 'polimero');
+  else if (has(t, 'tambor', 'drum')) setChoice(c, 'mag', 'tambor');
   else if (has(t, 'carregador curvo', 'banana', 'curvo')) setChoice(c, 'mag', 'curvo');
   else if (has(t, 'carregador reto', 'stanag', 'reto')) setChoice(c, 'mag', 'reto');
-  if (has(t, 'telescopica', 'retratil', 'coronha ajustavel')) setChoice(c, 'stock', 'telescopica');
+  if (has(t, 'telescopica', 'retratil', 'coronha ajustavel', 'coronha m4')) setChoice(c, 'stock', 'telescopica') || setChoice(c, 'stock', 'm4');
   else if (has(t, 'dobravel', 'rebativel', 'folding')) setChoice(c, 'stock', 'dobravel');
   else if (has(t, 'coronha fixa')) setChoice(c, 'stock', 'fixa');
   else if (has(t, 'sem coronha', 'pistol grip only')) setChoice(c, 'stock', 'nenhuma');
   if (has(t, 'faixa ventilada', 'vent rib')) setChoice(c, 'rib', 'sim');
+  if (has(t, 'freio de boca', 'compensador', 'muzzle brake')) setChoice(c, 'muzzle', 'freio');
+  else if (has(t, 'quebra-chamas', 'quebra chamas', 'birdcage', 'flash hider')) setChoice(c, 'muzzle', 'a2');
   if (has(t, 'barbado', 'viking')) setChoice(c, 'style', 'barbado');
   if (has(t, 'duplo', 'dupla', 'labrys')) setChoice(c, 'style', 'duplo');
   if (has(t, 'sulco', 'fuller')) setChoice(c, 'fuller', 'sim');
@@ -232,7 +240,7 @@ export function parsePrompt(prompt: string, fallbackId = 'assault-rifle'): Promp
 
   // Unrecognised long words, to be transparent about the limits of the vocabulary.
   const known = new Set(['de', 'com', 'e', 'em', 'cal', 'calibre', 'acabamento', 'mm', 'tatico', 'tatica', 'tactical', 'modelo', 'arma', 'um', 'uma', 'the', 'with', 'and', 'of']);
-  const flat = [...TYPE_RULES.flatMap(([, w]) => w), ...OPTIC_REDDOT, ...OPTIC_SCOPE].join(' ');
+  const flat = [...TYPE_RULES.flatMap(([, w]) => w), ...OPTIC_HOLO, ...OPTIC_REDDOT, ...OPTIC_SCOPE].join(' ');
   const ignored = t
     .split(' ')
     .filter((w) => w.length > 3 && !known.has(w) && !matched.has(w) && !flat.includes(w) && !c.out.some((o) => normalize(o).includes(w)) && !/^[\d.]+$/.test(w));

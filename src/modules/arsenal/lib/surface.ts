@@ -6,7 +6,7 @@ import type { CamoPattern } from './promptParser';
 // ---------------------------------------------------------------- edge wear
 
 /** Dihedral angle above which a polygon edge counts as a hard (wearable) edge. */
-export const WEAR_EDGE_DEG = 30;
+export const WEAR_EDGE_DEG = 25;
 
 /**
  * Per-corner attributes for metric edge wear, in the exact corner order of `toBufferGeometry`
@@ -29,10 +29,12 @@ export function edgeWearAttributes(m: P.PolyMesh): { bary: Float32Array; edgeH: 
     }),
   );
   const cosT = Math.cos((WEAR_EDGE_DEG * Math.PI) / 180);
+  const centre = m.f.map((f) => P.faceCenter(m, f));
+  // Only convex edges wear (outer corners get knocked); concave corners collect dirt instead.
   const hard = (a: number, b: number, fi: number) => {
     const fs = edgeFaces.get(P.edgeKey(a, b)) ?? [];
     if (fs.length < 2) return true; // open border
-    return fs.some((g) => g !== fi && dot3(faceN[g], faceN[fi]) < cosT);
+    return fs.some((g) => g !== fi && dot3(faceN[g], faceN[fi]) < cosT && dot3(faceN[fi], P.sub(centre[g], centre[fi])) < 0);
   };
   const tris = m.f.reduce((s, f) => s + f.length - 2, 0);
   const bary = new Float32Array(tris * 9);
@@ -104,16 +106,19 @@ float wearMask(){
   if (vEdgeH.x > 0.0) d = min(d, vBary.x * vEdgeH.x);
   if (vEdgeH.y > 0.0) d = min(d, vBary.y * vEdgeH.y);
   if (vEdgeH.z > 0.0) d = min(d, vBary.z * vEdgeH.z);
-  float n = wNoise(vWearPos * 900.0) * 0.55 + wNoise(vWearPos * 160.0) * 0.45;
-  float width = ${MAX_WEAR_WIDTH.toFixed(5)} * uWear * (0.25 + 1.5 * n);
-  return 1.0 - smoothstep(width * 0.6, width, d);
+  // Chipped, broken bands: medium noise decides where the edge is worn at all, fine noise frays the border.
+  float patches = wNoise(vWearPos * 420.0) * 0.65 + wNoise(vWearPos * 95.0) * 0.35;
+  float fray = wNoise(vWearPos * 2600.0);
+  float present = smoothstep(0.62 - uWear * 0.45, 0.72 - uWear * 0.45, patches);
+  float width = ${MAX_WEAR_WIDTH.toFixed(5)} * uWear * (0.35 + 1.3 * patches) * (0.6 + 0.8 * fray);
+  return (1.0 - smoothstep(width * 0.5, width, d)) * present;
 }`,
       )
       .replace('#include <color_fragment>', '#include <color_fragment>\nfloat wm = wearMask();\ndiffuseColor.rgb = mix(diffuseColor.rgb, uBare, wm);')
       .replace('#include <metalnessmap_fragment>', '#include <metalnessmap_fragment>\nmetalnessFactor = mix(metalnessFactor, 1.0, wm * uBareMetal);')
       .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = mix(roughnessFactor, 0.3, wm * uBareMetal);');
   };
-  mat.customProgramCacheKey = () => 'edge-wear-v2';
+  mat.customProgramCacheKey = () => 'edge-wear-v3';
   mat.needsUpdate = true;
 }
 

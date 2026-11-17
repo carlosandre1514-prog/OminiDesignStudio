@@ -28,6 +28,10 @@ export interface ArsenalState {
   edgeWear: number;
   roughness: number;
   metalness: number;
+  /** Texture Studio projects applied per material slot. */
+  custom: Partial<Record<WeaponPart['slot'], { id: string; name: string }>>;
+  /** Repeats of a custom texture per metre (tile = 1 / customScale m). */
+  customScale: number;
   // --- inspector
   hidden: Record<string, boolean>;
   solo: string | null;
@@ -67,7 +71,7 @@ function warmTextures(parts: WeaponPart[], finish: Finish) {
   }
 }
 
-const INITIAL = 'assault-rifle';
+const INITIAL = 'ar15-hd';
 
 export const useArsenal = create<ArsenalState>((set, get) => {
   /** Rebuild parts after a model change and clear part-specific inspector state. */
@@ -85,11 +89,13 @@ export const useArsenal = create<ArsenalState>((set, get) => {
     imageName: '',
     imageLength: 0.9,
     parts: partsFor({ source: 'catalog', imagePart: null, weaponId: INITIAL, params: initialParams, seed: 1 }),
-    finish: { ...DEFAULT_FINISH, polymer: 'preto', steel: 'escuro' },
+    finish: { ...DEFAULT_FINISH, ...weaponById(INITIAL).finish },
     camo: { pattern: 'nenhum', color: '#3a3d41' },
-    edgeWear: 0.35,
+    edgeWear: weaponById(INITIAL).finish?.wear ?? 0.35,
     roughness: 1,
     metalness: 1,
+    custom: {},
+    customScale: 8,
     hidden: {},
     solo: null,
     explode: 0,
@@ -101,7 +107,10 @@ export const useArsenal = create<ArsenalState>((set, get) => {
     stats: { fps: 0, tris: 0 },
 
     set: (p) => set(p),
-    setWeapon: (id) => rebuild({ weaponId: id, params: defaultParams(weaponById(id)), seed: 1, source: 'catalog' }),
+    setWeapon: (id) => {
+      const w = weaponById(id);
+      rebuild({ weaponId: id, params: defaultParams(w), seed: 1, source: 'catalog', ...(w.finish ? { finish: { ...DEFAULT_FINISH, ...w.finish }, edgeWear: w.finish.wear ?? get().edgeWear } : {}) });
+    },
     setParam: (key, value) => {
       const params = { ...get().params, [key]: value };
       const next = { ...get(), params };

@@ -7,6 +7,8 @@ import type { WeaponPart, WeaponType } from '@/modules/studio-3d/weapons/catalog
 import { encodePng, materialFor, type Finish } from '@/modules/studio-3d/weapons/textures';
 import type { CamoPattern } from './promptParser';
 import { slotTextures } from '../canvas/useWeaponMaterials';
+import { textureProjectMaps } from './textureLink';
+import type { Slot } from '@/modules/studio-3d/weapons/catalog';
 
 export type ExportFormat = 'glb' | 'gltf' | 'obj';
 
@@ -58,6 +60,9 @@ export function exportableScene(root: THREE.Object3D): THREE.Scene {
       mat.map = toCanvasTexture(mat.map, texCache);
       mat.roughnessMap = toCanvasTexture(mat.roughnessMap, texCache);
       mat.normalMap = toCanvasTexture(mat.normalMap, texCache);
+      mat.metalnessMap = toCanvasTexture(mat.metalnessMap, texCache);
+      mat.aoMap = toCanvasTexture(mat.aoMap, texCache);
+      mat.emissiveMap = toCanvasTexture(mat.emissiveMap, texCache);
       mat.name = src.name;
       mats.set(src, mat);
     }
@@ -91,13 +96,39 @@ export async function exportWeapon(root: THREE.Object3D, format: ExportFormat, b
  * Open the weapon in the full 3D Design Studio: textures (with coating) go to the Asset Library,
  * and a new 3D project is created with the weapon as a group of editable meshes.
  */
-export async function sendToStudio(weapon: WeaponType, parts: WeaponPart[], finish: Finish, camo: { pattern: CamoPattern; color: string }, name: string): Promise<string> {
+export async function sendToStudio(
+  weapon: WeaponType,
+  parts: WeaponPart[],
+  finish: Finish,
+  camo: { pattern: CamoPattern; color: string },
+  name: string,
+  custom: Partial<Record<Slot, { id: string; name: string }>> = {},
+): Promise<string> {
   const textures: Record<string, TextureIds> = {};
   const done = new Set<string>();
   for (const p of parts) {
     const spec = materialFor(p.slot, finish);
     if (done.has(spec.key)) continue;
     done.add(spec.key);
+    const studio = custom[p.slot];
+    if (studio) {
+      // Texture Studio material: full PBR set (colour, roughness, metal, normal, AO)
+      const maps = await textureProjectMaps(studio.id, 1024);
+      const ids: TextureIds = {};
+      for (const [map, data, label] of [
+        ['map', maps.baseColor, 'cor'],
+        ['roughnessMap', maps.roughness, 'rugosidade'],
+        ['metalnessMap', maps.metallic, 'metalico'],
+        ['normalMap', maps.normal, 'normal'],
+        ['aoMap', maps.ao, 'ao'],
+      ] as const) {
+        const r = await importAssetBytes(`estudio-${studio.id}-${label}.png`, await encodePng(data, maps.size), { name: `${studio.name} — ${label}`, category: 'textures', tags: ['arma', 'arsenal', 'textura'] });
+        if (r.status === 'error') throw new Error(r.error);
+        ids[map] = r.asset.id;
+      }
+      textures[spec.key] = ids;
+      continue;
+    }
     const tex = slotTextures(p.slot, spec, { camo }, 512);
     if (!tex) continue;
     const ids: TextureIds = {};

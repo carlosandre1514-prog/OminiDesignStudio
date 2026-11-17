@@ -7,6 +7,7 @@ import { Btn, FOCUS, Section, Segmented, Slider, useProfile } from './ui';
 
 export const EXAMPLES = [
   'Fuzil de assalto tático cal. 5.56 com acabamento cerakote preto fosco e mira holográfica',
+  'M4 com red dot, PMAG, freio de boca e cerakote FDE',
   'Rifle de precisão .308 com luneta, bipé e supressor, camuflagem woodland',
   'Pistola 9mm compacta FDE com lanterna',
   'Submetralhadora com coronha dobrável, camuflado digital, desgastada',

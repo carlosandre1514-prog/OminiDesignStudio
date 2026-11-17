@@ -1,9 +1,12 @@
 import * as B from '../mesh/builders';
 import { T, place } from '../mesh/builders';
 import * as P from '../mesh/polyMesh';
+import type { Finish } from './textures';
+import { buildAR15 } from './hd/ar15';
+import { buildPistolHD } from './hd/pistol';
 
 /** Material slot of a part; the finish chosen by the user decides the actual texture. */
-export type Slot = 'blade' | 'metal' | 'dark' | 'trim' | 'wood' | 'grip' | 'polymer' | 'string' | 'fletch' | 'glow' | 'crystal';
+export type Slot = 'blade' | 'metal' | 'dark' | 'trim' | 'wood' | 'grip' | 'polymer' | 'string' | 'fletch' | 'glow' | 'crystal' | 'anodized' | 'bright' | 'lens';
 
 export interface WeaponPart {
   name: string;
@@ -49,6 +52,10 @@ export interface WeaponType {
   nums: NumParam[];
   choices: ChoiceParam[];
   build(p: Params, r: ReturnType<typeof B.rng>): WeaponPart[];
+  /** Realistic default finishes for this weapon (merged over the global defaults). */
+  finish?: Partial<Finish>;
+  /** High-detail model (hard-surface kit, hundreds of parts features). */
+  hd?: boolean;
 }
 
 const n = (p: Params, k: string) => Number(p[k]);
@@ -756,7 +763,41 @@ const staff: WeaponType = {
   },
 };
 
-export const WEAPONS: WeaponType[] = [longsword, katana, dagger, axe, spear, warhammer, shield, pistol, assaultRifle, shotgun, sniper, smg, recurveBow, longbow, crossbow, arrow, energySword, plasmaRifle, laserPistol, staff];
+const ar15: WeaponType = {
+  id: 'ar15-hd',
+  name: 'Fuzil AR-15 (HD)',
+  category: 'firearm',
+  hd: true,
+  description: 'Alta definição: receptores bipartidos com janela de ejeção real, Picatinny com fendas, guarda-mão M-LOK vazado, quebra-chamas A2, pinos e controles.',
+  nums: [num('barrel', 'Cano (da culatra)', 0.26, 0.51, 0.368, 0.005), num('handguard', 'Guarda-mão', 0.18, 0.38, 0.3, 0.01), num('magLen', 'Carregador', 0.1, 0.2, 0.165, 0.005), num('stockPos', 'Extensão da coronha', 0, 0.08, 0.04, 0.005)],
+  choices: [
+    choice('optic', 'Ótica', [['holo', 'Holográfica'], ['reddot', 'Red dot'], ['luneta', 'Luneta LPVO'], ['iron', 'Miras mecânicas'], ['nenhuma', 'Nenhuma']]),
+    choice('muzzle', 'Bocal', [['a2', 'Quebra-chamas A2'], ['freio', 'Freio de boca']]),
+    choice('mag', 'Carregador', [['aluminio', 'Alumínio'], ['polimero', 'Polímero com janela']]),
+    choice('stock', 'Coronha', [['m4', 'M4 retrátil'], ['nenhuma', 'Sem coronha']]),
+  ],
+  finish: { steel: 'escuro', polymer: 'preto', grip: 'borracha', energy: 'vermelho', wear: 0.15 },
+  build: (p) => buildAR15(p),
+};
+
+const pistolHD: WeaponType = {
+  id: 'pistol-hd',
+  name: 'Pistola 9mm (HD)',
+  category: 'firearm',
+  hd: true,
+  description: 'Alta definição: ferrolho com janela de ejeção e boca reais, serrilhas, miras com pontos luminosos, armação de polímero com trilho e textura.',
+  nums: [num('slide', 'Comprimento do ferrolho', 0.165, 0.205, 0.185, 0.005), num('grip', 'Ângulo da empunhadura (°)', 16, 24, 21, 1, '°'), num('gripLen', 'Altura da empunhadura', 0.07, 0.1, 0.082, 0.002)],
+  choices: [
+    choice('serr', 'Serrilhas', [['frente', 'Traseiras + frontais'], ['tras', 'Só traseiras'], ['nao', 'Sem serrilhas']]),
+    choice('grooves', 'Apoio dos dedos', YESNO, 'nao'),
+    choice('light', 'Lanterna no trilho', YESNO, 'nao'),
+    choice('suppressor', 'Supressor', YESNO, 'nao'),
+  ],
+  finish: { steel: 'escuro', polymer: 'preto', grip: 'borracha', energy: 'verde', wear: 0.12 },
+  build: (p) => buildPistolHD(p),
+};
+
+export const WEAPONS: WeaponType[] = [ar15, pistolHD, longsword, katana, dagger, axe, spear, warhammer, shield, pistol, assaultRifle, shotgun, sniper, smg, recurveBow, longbow, crossbow, arrow, energySword, plasmaRifle, laserPistol, staff];
 
 export function defaultParams(w: WeaponType): Params {
   const p: Params = {};

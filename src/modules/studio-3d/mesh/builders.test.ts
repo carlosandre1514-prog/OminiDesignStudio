@@ -69,3 +69,41 @@ describe('auto smooth shading', () => {
     expect(mixed).toBeGreaterThan(0);
   });
 });
+
+describe('hard-surface builders', () => {
+  it('bevelExtrude is closed, keeps the outer size and rounds the edges', async () => {
+    const { bevelExtrude, extrude, roundedRect, circle } = await import('./builders');
+    const outline: [number, number][] = [[0, 0], [0.2, 0], [0.2, 0.05], [0.12, 0.05], [0.1, 0.12], [0, 0.12]];
+    const hole = roundedRect(0.04, 0.02, 0.008, 4, 0.06, 0.025);
+    const m = bevelExtrude(outline, 0.03, 0.004, [hole], 3);
+    expect(P.isClosedManifold(m)).toBe(true);
+    expect(P.volume(m)).toBeGreaterThan(0);
+    const ref = extrude(outline, 0.03, [hole]);
+    expect(P.volume(m)).toBeLessThan(P.volume(ref));
+    expect(P.volume(m)).toBeGreaterThan(P.volume(ref) * 0.85);
+    const bx = P.bounds(m);
+    expect(bx.max[0] - bx.min[0]).toBeCloseTo(0.2, 4);
+    expect(bx.max[2] - bx.min[2]).toBeCloseTo(0.03, 6);
+    expect(P.isClosedManifold(bevelExtrude(circle(0.01, 20), 0.005, 0.001))).toBe(true);
+  });
+
+  it('latheLoop revolves a closed profile into a hollow ring', async () => {
+    const { latheLoop } = await import('./builders');
+    const ring = latheLoop([[0.004, 0], [0.007, 0], [0.007, 0.02], [0.004, 0.02]], 24);
+    expect(P.isClosedManifold(ring)).toBe(true);
+    const vol = P.volume(ring);
+    const exact = Math.PI * (0.007 ** 2 - 0.004 ** 2) * 0.02;
+    expect(vol).toBeGreaterThan(exact * 0.93);
+    expect(vol).toBeLessThan(exact * 1.01);
+  });
+
+  it('offsetPolygon moves edges by the distance', async () => {
+    const { offsetPolygon } = await import('./builders');
+    const sq: [number, number][] = [[0, 0], [1, 0], [1, 1], [0, 1]];
+    const o = offsetPolygon(sq, 0.1);
+    expect(o[0][0]).toBeCloseTo(0.1, 6);
+    expect(o[0][1]).toBeCloseTo(0.1, 6);
+    const cw = offsetPolygon([...sq].reverse(), 0.1);
+    expect(cw[3][0]).toBeCloseTo(0.1, 6);
+  });
+});

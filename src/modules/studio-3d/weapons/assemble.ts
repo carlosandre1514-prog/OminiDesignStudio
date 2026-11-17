@@ -10,6 +10,8 @@ export interface TextureIds {
   map?: string;
   roughnessMap?: string;
   normalMap?: string;
+  metalnessMap?: string;
+  aoMap?: string;
 }
 
 /** Weapons modelled along +X (guns, crossbows) get their texture direction rotated so grain/brushing follows the length. */
@@ -31,7 +33,15 @@ export function materialDef(spec: MaterialSpec, tex: TextureIds | undefined, hor
       ...(tex.map ? { map: assetUri(tex.map) } : {}),
       ...(tex.roughnessMap ? { roughnessMap: assetUri(tex.roughnessMap) } : {}),
       ...(tex.normalMap ? { normalMap: assetUri(tex.normalMap) } : {}),
+      ...(tex.metalnessMap ? { metalnessMap: assetUri(tex.metalnessMap) } : {}),
+      ...(tex.aoMap ? { aoMap: assetUri(tex.aoMap) } : {}),
     };
+    if (tex.metalnessMap) {
+      // full PBR set from the Texture Studio: maps carry the values
+      m.color = '#ffffff';
+      m.metalness = 1;
+      m.roughness = 1;
+    }
     m.uvRepeat = [UV_REPEAT, UV_REPEAT];
     m.uvRotation = horizontal ? 90 : 0;
   }
