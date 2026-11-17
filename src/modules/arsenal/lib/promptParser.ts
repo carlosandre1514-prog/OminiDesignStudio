@@ -151,6 +151,12 @@ export function parsePrompt(prompt: string, fallbackId = 'assault-rifle'): Promp
   else if (has(t, 'tambor', 'drum')) setChoice(c, 'mag', 'tambor');
   else if (has(t, 'carregador curvo', 'banana', 'curvo')) setChoice(c, 'mag', 'curvo');
   else if (has(t, 'carregador reto', 'stanag', 'reto')) setChoice(c, 'mag', 'reto');
+  // AR-15 furniture named in the prompt
+  if (has(t, 'bcm', 'gunfighter', 'coronha bcm')) setChoice(c, 'stock', 'bcm');
+  if (has(t, 'springfield')) matched.add('springfield');
+  if (has(t, 'moe', 'guarda-mao de polimero', 'guarda mao de polimero', 'guarda-mao polimero', 'massa de mira a2', 'massa a2', 'front sight a2', 'a2 front sight', 'saint')) setChoice(c, 'handguard', 'moe');
+  else if (has(t, 'free float', 'free-float', 'guarda-mao de aluminio', 'guarda mao de aluminio', 'trilho m-lok de aluminio')) setChoice(c, 'handguard', 'mlok');
+  if (has(t, 'pmag', 'carregador de polimero')) setChoice(c, 'mag', 'polimero');
   if (has(t, 'telescopica', 'retratil', 'coronha ajustavel', 'coronha m4')) setChoice(c, 'stock', 'telescopica') || setChoice(c, 'stock', 'm4');
   else if (has(t, 'dobravel', 'rebativel', 'folding')) setChoice(c, 'stock', 'dobravel') || setChoice(c, 'stock', 'retratil');
   else if (has(t, 'coronha fixa')) setChoice(c, 'stock', 'fixa');
