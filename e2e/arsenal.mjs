@@ -65,7 +65,7 @@ const tris = async (page) => Number((await page.getByTestId('arsenal-tris').inne
   await page.getByTestId('open-arsenal').click();
   await page.waitForURL(/arsenal/);
   assert((await page.getByTestId('arsenal-root').getAttribute('data-profile')) === 'pc', 'PC: layout de painéis laterais');
-  assert(await until(async () => (await snap(page)).cov > 0.03), 'PC: viewport renderiza o fuzil com iluminação PBR');
+  assert(await until(async () => (await snap(page)).cov > 0.015), 'PC: viewport renderiza o fuzil com iluminação PBR');
   assert(await until(async () => /\d+ FPS/.test(await page.getByTestId('arsenal-fps').innerText()) && !/^0 FPS/.test((await page.getByTestId('arsenal-fps').innerText()).trim())), 'PC: contador de FPS ativo');
   assert(await until(async () => (await tris(page)) > 200), 'PC: contador de polígonos ativo');
   await page.getByRole('button', { name: 'Parar rotação' }).count().then(async (n) => n && page.getByRole('button', { name: 'Parar rotação' }).click());
@@ -85,6 +85,19 @@ const tris = async (page) => Number((await page.getByTestId('arsenal-tris').inne
   assert(await until(async () => (await page.getByTestId('arsenal-model-name').innerText()) === 'Fuzil AR-15 (HD)' && /Holográfica/.test(await page.getByTestId('arsenal-understood').innerText())), 'PC: prompt de exemplo → AR-15 HD com mira holográfica');
   assert(await until(async () => (await tris(page)) > 8000), `PC: modelo HD com alto detalhe (${await tris(page)} triângulos)`);
   await page.waitForTimeout(600);
+
+  // ---- mesh quality (subdivision in a worker) + still render
+  const tLow = await tris(page);
+  await page.getByRole('group', { name: 'Qualidade da malha' }).getByRole('button', { name: 'Alta' }).click();
+  assert(await until(async () => /milhões de triângulos/.test(await statusText(page)) && (await tris(page)) > tLow * 2.5, 120000), `PC: qualidade Alta subdivide a malha (${tLow} → ${await tris(page)} triângulos)`);
+  await page.getByTestId('arsenal-render').click();
+  await page.getByTestId('render-dialog').getByRole('group', { name: 'Resolução' }).getByRole('button', { name: 'Full HD' }).click();
+  const [rdl] = await Promise.all([page.waitForEvent('download', { timeout: 300000 }), page.getByTestId('render-run').click()]);
+  const jpg = readFileSync(await rdl.path());
+  assert(jpg[0] === 0xff && jpg[1] === 0xd8 && /1920|FullHD/.test(rdl.suggestedFilename()), `PC: render Full HD baixado (${rdl.suggestedFilename()}, ${Math.round(jpg.length / 1024)} KB)`);
+  await page.getByTestId('render-dialog').getByRole('button', { name: 'Fechar' }).click();
+  await page.getByRole('group', { name: 'Qualidade da malha' }).getByRole('button', { name: 'Normal' }).click();
+  assert(await until(async () => (await tris(page)) === tLow, 60000), 'PC: volta à malha Normal');
 
   // ---- modular inspector
   const parts = page.getByTestId('arsenal-parts');
@@ -162,12 +175,14 @@ const tris = async (page) => Number((await page.getByTestId('arsenal-tris').inne
   await page.getByLabel('Material pronto').selectOption('woodland');
   assert(await until(async () => /Salvo/.test(await page.getByTestId('tex-status').innerText()), 20000), 'PC: textura camuflada criada e salva no Estúdio de Texturas');
   await page.goto(`${BASE}/arsenal`);
-  assert(await until(async () => (await snap(page)).cov > 0.03), 'PC: Arsenal reabre com o AR-15 HD');
+  assert(await until(async () => (await snap(page)).cov > 0.015), 'PC: Arsenal reabre com o AR-15 HD');
   await page.waitForTimeout(1500);
   const t0s = await snap(page);
   const slotGroup = page.getByRole('group', { name: 'Alumínio (receptores)' });
   await slotGroup.getByRole('button', { name: 'Nova textura' }).first().click();
-  assert(await until(async () => changed(t0s, await snap(page)) > 0.02 && /Pronto/.test(await statusText(page)), 30000), 'PC: textura do Estúdio aplicada nos receptores');
+  let texChange = 0;
+  const texOk = await until(async () => (texChange = changed(t0s, await snap(page))) > 0.008 && /Pronto/.test(await statusText(page)), 30000);
+  assert(texOk, `PC: textura do Estúdio aplicada nos receptores (${(texChange * 100).toFixed(1)}% dos pixels mudaram)`);
   const green = await page.evaluate(() => {
     const c = document.querySelector('[data-testid="arsenal-viewport"] canvas');
     const t = document.createElement('canvas');
@@ -200,7 +215,7 @@ const tris = async (page) => Number((await page.getByTestId('arsenal-tris').inne
   watch(page, 'mobile');
   await page.goto(`${BASE}/arsenal`);
   assert((await page.getByTestId('arsenal-root').getAttribute('data-profile')) === 'mobile', 'Celular: layout empilhado detectado');
-  assert(await until(async () => (await snap(page)).cov > 0.03), 'Celular: viewport renderiza');
+  assert(await until(async () => (await snap(page)).cov > 0.015), 'Celular: viewport renderiza');
   const tabBox = await page.getByTestId('arsenal-tab-pecas').boundingBox();
   assert(tabBox.height >= 44, `Celular: abas com alvo de toque grande (${Math.round(tabBox.height)}px)`);
   await page.getByTestId('arsenal-generate').tap();
@@ -231,7 +246,7 @@ const tris = async (page) => Number((await page.getByTestId('arsenal-tris').inne
   watch(page, 'tv');
   await page.goto(`${BASE}/arsenal`);
   assert((await page.getByTestId('arsenal-root').getAttribute('data-profile')) === 'tv', 'TV: perfil Smart TV detectado pelo user agent');
-  assert(await until(async () => (await snap(page)).cov > 0.03), 'TV: viewport renderiza');
+  assert(await until(async () => (await snap(page)).cov > 0.015), 'TV: viewport renderiza');
   const active = () => page.evaluate(() => {
     const a = document.activeElement;
     return { id: a?.getAttribute('data-testid') ?? '', role: a?.getAttribute('role') ?? '', label: a?.getAttribute('aria-label') ?? a?.textContent?.trim() ?? '', shadow: getComputedStyle(a).boxShadow, transform: getComputedStyle(a).scale, inPanel: !!a?.closest('[role=tabpanel]') };

@@ -99,10 +99,10 @@ export function materialFor(slot: Slot, f: Finish): MaterialSpec {
       const kind: Pattern['kind'] = f.grip === 'tecido' ? 'wrap' : f.grip === 'borracha' ? 'rubber' : 'leather';
       const pal: Record<Finish['grip'], [RGB, RGB]> = { 'couro-marrom': [[52, 30, 18], [120, 74, 44]], 'couro-preto': [[14, 13, 13], [52, 48, 46]], tecido: [[24, 22, 26], [92, 86, 96]], borracha: [[30, 31, 33], [58, 59, 62]] };
       const [dark, light] = pal[f.grip];
-      return { key: `grip-${f.grip}`, name: FINISH_LABELS.grip.options[f.grip], color: '#ffffff', metalness: 0, roughness: 1, normalScale: 1.4, pattern: { kind, dark, light, rough: [0.55, 0.9], wear: w, seed: 51 } };
+      return { key: `grip-${f.grip}`, name: FINISH_LABELS.grip.options[f.grip], color: '#ffffff', metalness: 0, roughness: 1, normalScale: kind === 'rubber' ? 1 : 1.4, pattern: { kind, dark, light, rough: [0.55, 0.9], wear: w, seed: 51 } };
     }
     case 'polymer': {
-      const pal: Record<Finish['polymer'], [RGB, RGB]> = { preto: [[36, 37, 39], [60, 61, 64]], areia: [[150, 124, 88], [196, 170, 128]], oliva: [[56, 62, 38], [96, 104, 66]], cinza: [[70, 72, 74], [118, 120, 122]] };
+      const pal: Record<Finish['polymer'], [RGB, RGB]> = { preto: [[30, 31, 33], [48, 49, 52]], areia: [[150, 124, 88], [196, 170, 128]], oliva: [[56, 62, 38], [96, 104, 66]], cinza: [[70, 72, 74], [118, 120, 122]] };
       const [dark, light] = pal[f.polymer];
       return { key: `polymer-${f.polymer}`, name: `Polímero ${FINISH_LABELS.polymer.options[f.polymer].toLowerCase()}`, color: '#ffffff', metalness: 0, roughness: 1, pattern: { kind: 'polymer', dark, light, rough: [0.55, 0.8], wear: w, seed: 61 } };
     }
@@ -216,7 +216,7 @@ function sampler(p: Pattern) {
   const fbm2 = makeFbm(p.seed + 7);
   const cells = makeCells(p.seed + 3, 12);
   const big = makeCells(p.seed + 5, 5);
-  const fine = makeCells(p.seed + 9, 150);
+  const fine = makeCells(p.seed + 9, 96);
   return (u: number, v: number): { h: number; mix: number; rough: number; dirt: number } => {
     const grime = clamp01((fbm2(u, v, 3, 3) - 0.55) * 3) * p.wear;
     let h = 0.5;
@@ -286,15 +286,16 @@ function sampler(p: Pattern) {
       case 'rubber': {
         // fine stippling (~1 mm dimples at the default 25 cm tile)
         const c = fine(u, v);
-        const stipple = 1 - Math.min(1, c * 1.6);
-        h = 0.35 + stipple * 0.45 + fbm(u, v, 64, 64, 2) * 0.2;
-        mix = 0.4 + stipple * 0.2;
-        rough = 0.8;
+        const stipple = 1 - Math.min(1, c * 1.4);
+        h = 0.4 + stipple * 0.3 + (fbm(u, v, 64, 64, 2) - 0.5) * 0.06;
+        // relief does the work; the colour stays almost uniform (no black/white speckle up close)
+        mix = 0.46 + stipple * 0.05;
+        rough = 0.8 + stipple * 0.08;
         break;
       }
       case 'polymer': {
         const n = fbm(u, v, 160, 160, 2);
-        h = 0.5 + (n - 0.5) * 0.12;
+        h = 0.5 + (n - 0.5) * 0.06;
         mix = 0.45 + (fbm2(u, v, 6, 6) - 0.5) * 0.15 + (n - 0.5) * 0.12;
         rough = 0.5 + n * 0.5;
         break;
@@ -344,7 +345,7 @@ function scratchMask(p: Pattern, size: number): Float32Array {
 }
 
 /** Normal-map strength per pattern: fine finishes get subtle relief, cord wraps and leather get more. */
-const BUMP: Record<Pattern['kind'], number> = { brushed: 1.2, damascus: 1.5, blackened: 0.8, hammered: 2.5, wood: 1.6, leather: 2.2, wrap: 3, rubber: 1.8, polymer: 0.6, rust: 2.5 };
+const BUMP: Record<Pattern['kind'], number> = { brushed: 1.2, damascus: 1.5, blackened: 0.8, hammered: 2.5, wood: 1.6, leather: 2.2, wrap: 3, rubber: 0.55, polymer: 0.5, rust: 2.5 };
 
 export function synthesize(p: Pattern, size = 256): TextureSet {
   const sample = sampler(p);
@@ -360,7 +361,7 @@ export function synthesize(p: Pattern, size = 256): TextureSet {
       const s = sample(x / size, y / size);
       const sc = scratch[i];
       if (sc > 0) {
-        s.h = clamp01(s.h - sc * 0.15);
+        s.h = clamp01(s.h - sc * (p.kind === 'rubber' || p.kind === 'polymer' ? 0 : 0.04));
         s.mix = clamp01(s.mix + sc * 0.5);
         s.rough = clamp01(s.rough - sc * 0.3);
       }
@@ -368,7 +369,7 @@ export function synthesize(p: Pattern, size = 256): TextureSet {
       const dirt = s.dirt * 0.55;
       for (let c = 0; c < 3; c++) color[i * 4 + c] = (p.dark[c] + (p.light[c] - p.dark[c]) * s.mix) * (1 - dirt) + 30 * dirt;
       color[i * 4 + 3] = 255;
-      const rgh = p.rough[0] + (p.rough[1] - p.rough[0]) * s.rough + s.dirt * 0.3;
+      const rgh = p.rough[0] + (p.rough[1] - p.rough[0]) * s.rough + s.dirt * 0.12;
       roughness[i * 4] = 255;
       roughness[i * 4 + 1] = clamp01(rgh) * 255;
       roughness[i * 4 + 2] = 255;

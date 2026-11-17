@@ -116,7 +116,7 @@ export function useWeaponMaterials(slots: Slot[], s: SurfaceSettings) {
     // Subtle: worn coatings reveal grey steel/aluminium, not chrome.
     uniforms.metal.uBare.value.set('#aab0b8');
     uniforms.metal.uBareMetal.value = 1;
-    uniforms.polymer.uBare.value.set('#6a6a68');
+    uniforms.polymer.uBare.value.set('#56565a');
     uniforms.polymer.uBareMetal.value = 0;
     uniforms.wood.uBare.value.set('#c9a27a');
     uniforms.wood.uBareMetal.value = 0;

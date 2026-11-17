@@ -110,6 +110,13 @@ _Última atualização: 2026-11-14 (Fase 4 — 3D Design Studio)_
 - Vistas 3/4, lateral, topo e frente no Arsenal, e link direto por arma (`/arsenal?arma=ak-hd`).
 - Construtores mais robustos: chanfro limitado automaticamente pela espessura do contorno e cantos de retângulos sem pontos duplicados.
 
+### ✅ Milhões de polígonos, render 8K e AR-15 fiel à referência
+- **Qualidade da malha** nas armas HD: Normal (~20 mil), Alta (~100 mil), Ultra (~0,7 mi) e **Cinema (~3 mi de triângulos)**. Subdivisão Catmull–Clark num Web Worker, com **loops de apoio automáticos** (pontos a ~1 mm dos cantos, calculados pelo chanfro e pelo ângulo) para as quinas não "derreterem"; geometria indexada (~30 bytes/triângulo); peças segmentadas ficam fora da subdivisão. Desgaste por curvatura na malha densa.
+- **Render de imagem**: Full HD, 4K ou **8K**, proporções 16:9/4:3/1:1/9:16, PNG ou JPEG, renderizado por blocos (passa do limite de textura da GPU) e enquadrado para a proporção escolhida. Cenas: Estúdio, **Estúdio dramático** (spot com sombra 4096, luzes de recorte fria/quente, faixas de reflexo, piso, vinheta) e Fundo claro.
+- Acabamentos **titânio escuro** e **preto fosco**; AR-15 com **holográfica + lupa 3×** e **empunhadura ergonômica**; prompts em inglês (hyper-realistic, 8k, --ar 16:9, dramatic shadows…) configuram arma, malha, cena e render.
+- **AR-15 configurado como a referência** (carabina com guarda-mão de polímero M-LOK arredondado, massa de mira A2, cano de 16", PMAG texturizado, alça traseira levantada, guarda-mato grande); a versão free-float de alumínio continua disponível.
+- Texturas de perto mais limpas: pontilhado de borracha sem "chuvisco" preto e branco, riscos de desgaste só na cor/rugosidade (sem vincos no relevo) e sujeira com menos manchas de brilho.
+
 ### ✅ IA no aparelho (sem servidor, sem API)
 - ONNX Runtime Web (WebGPU ou WASM) com modelos abertos baixados uma vez e guardados offline: U²-Netp (recorte, Apache-2.0) e Depth Anything V2 small (profundidade, Apache-2.0).
 - **Arsenal → Foto → 3D (IA)**: a foto vira sólido 3D estanque em tamanho real, com relevo pela profundidade, bordas arredondadas e a própria foto como textura (mais o mapa normal da profundidade). Exporta GLB/GLTF/OBJ e abre no Estúdio 3D com a textura mapeada.

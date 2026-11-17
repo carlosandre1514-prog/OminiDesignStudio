@@ -62,6 +62,8 @@ export function WeaponModel() {
     const items = parts.map((p) => {
       const geometry = toBufferGeometry(p.mesh, { shading: p.shading ?? 'auto', uv: p.uv ?? 'box' });
       const wear = edgeWearAttributes(p.mesh);
+      // segmented parts: the internal butt joints are not real edges, so no edge wear there
+      if (p.subdiv === false) wear.edgeH.fill(-1);
       geometry.setAttribute('bary', new THREE.BufferAttribute(wear.bary, 3));
       geometry.setAttribute('edgeH', new THREE.BufferAttribute(wear.edgeH, 3));
       return { part: p, geometry };
@@ -86,18 +88,19 @@ export function WeaponModel() {
   // High-poly path: subdivide in a worker, swap the geometries in when ready (low-poly shown meanwhile).
   const quality = useArsenal((s) => s.quality);
   const levels = source === 'image' ? 0 : QUALITY[quality].subdiv;
-  const [dense, setDense] = useState<THREE.BufferGeometry[] | null>(null);
+  const [dense, setDense] = useState<(THREE.BufferGeometry | null)[] | null>(null);
   useEffect(() => {
     setDense(null);
     if (!levels) return;
     let alive = true;
     const st = useArsenal.getState();
     st.set({ status: { kind: 'busy', text: `Gerando malha ${QUALITY[quality].label} (subdivisão ×${4 ** levels})…` } });
-    buildDense(parts.map((p) => p.mesh), levels, (pr) => alive && useArsenal.getState().set({ status: { kind: 'busy', text: `Gerando malha ${QUALITY[quality].label}: ${Math.round(pr * 100)}%` } }))
+    const subd = parts.map((p) => p.subdiv !== false);
+    buildDense(parts.filter((_, i) => subd[i]).map((p) => p.mesh), levels, (pr) => alive && useArsenal.getState().set({ status: { kind: 'busy', text: `Gerando malha ${QUALITY[quality].label}: ${Math.round(pr * 100)}%` } }))
       .then((geos) => {
         if (!alive) return;
         let total = 0;
-        const list = geos.map((g) => {
+        const made = geos.map((g) => {
           const b = new THREE.BufferGeometry();
           b.setAttribute('position', new THREE.BufferAttribute(g.position, 3));
           b.setAttribute('normal', new THREE.BufferAttribute(g.normal, 3));
@@ -111,6 +114,13 @@ export function WeaponModel() {
           total += g.triangles;
           return b;
         });
+        // parts that must not be subdivided keep their exact (low-poly path) geometry: null = use the base one
+        let gi = 0;
+        const list = subd.map((ok, i) => {
+          if (ok) return made[gi++];
+          total += (built[i]?.geometry.getAttribute('position').count ?? 0) / 3;
+          return null;
+        });
         setDense(list);
         useArsenal.getState().set({ status: { kind: 'ready', text: `Pronto · ${(total / 1e6).toFixed(total > 1e6 ? 2 : 3)} milhões de triângulos` } });
       })
@@ -119,7 +129,7 @@ export function WeaponModel() {
       alive = false;
     };
   }, [parts, levels, quality]);
-  useEffect(() => () => dense?.forEach((g) => g.dispose()), [dense]);
+  useEffect(() => () => dense?.forEach((g) => g?.dispose()), [dense]);
 
   const group = useRef<THREE.Group>(null);
   useEffect(() => {

@@ -1,5 +1,5 @@
 import type { Params, WeaponPart } from '../catalog';
-import { alongX, B, picatinny, pinZ, place, sector, side, T, top, tubeX, turnX, type V2 } from './kit';
+import { alongX, B, picatinny, pinZ, place, sector, side, superSector, T, top, tubeX, turnX, type V2 } from './kit';
 
 /**
  * AR-15 pattern carbine, high detail. Real-world proportions (M4-type, 14.5–20" barrels).
@@ -15,11 +15,11 @@ const HW = 0.01225; // receiver half width
 
 export function buildAR15(p: Params): WeaponPart[] {
   const parts: WeaponPart[] = [];
-  const add = (name: string, slot: WeaponPart['slot'], mesh: WeaponPart['mesh'], shading: WeaponPart['shading'] = 'auto') => parts.push({ name, slot, mesh, shading });
+  const add = (name: string, slot: WeaponPart['slot'], mesh: WeaponPart['mesh'], shading: WeaponPart['shading'] = 'auto', subdiv = true) => parts.push({ name, slot, mesh, shading, subdiv });
 
   const barrelLen = n(p, 'barrel'); // from bolt face (~x = 0.15)
   const muzzle = 0.15 + barrelLen;
-  const hgEnd = Math.min(0.185 + n(p, 'handguard'), muzzle - 0.03);
+  const hgEnd = Math.min(0.185 + n(p, 'hgLen'), muzzle - 0.03);
 
   // ------------------------------------------------------------------ upper receiver
   const upperOutline: V2[] = [
@@ -66,7 +66,8 @@ export function buildAR15(p: Params): WeaponPart[] {
   ];
   add('Receptor inferior', 'anodized', side(lowerOutline, -HW, HW, 0.0013));
   add('Boca do carregador', 'anodized', side(B.roundedRect(0.074, 0.009, 0.0025, 3, 0.099, -0.0715), -0.0142, 0.0142, 0.0016));
-  add('Guarda-mato', 'anodized', side([[0.012, -0.0425], [0.058, -0.0425], [0.058, -0.05], [0.05, -0.0595], [0.018, -0.0595], [0.012, -0.052]], -0.0045, 0.0045, 0.0007, [[[0.0175, -0.0455], [0.0535, -0.0455], [0.0475, -0.0545], [0.0215, -0.0545]]]));
+  // integrated, oversized trigger guard (rounded, room for gloves)
+  add('Guarda-mato', 'anodized', side([[0.014, -0.0425], [0.061, -0.0425], [0.061, -0.05], [0.054, -0.0625], [0.038, -0.0665], [0.024, -0.064], [0.016, -0.056]], -0.0048, 0.0048, 0.0008, [[[0.0195, -0.0458], [0.0565, -0.0458], [0.0505, -0.0585], [0.0375, -0.0622], [0.0255, -0.0598], [0.0205, -0.0535]]]));
   add('Gatilho', 'dark', side([[0.033, -0.04], [0.037, -0.04], [0.0375, -0.046], [0.0355, -0.0525], [0.031, -0.0545], [0.0325, -0.049], [0.033, -0.044]], -0.0028, 0.0028, 0.0006));
   add('Pinos', 'dark', B.merge(...[[0.158, -0.024], [-0.004, -0.026], [0.034, -0.033], [0.048, -0.03]].flatMap(([x, y]) => [pinZ(x, y, HW + 0.0004, 0.0029, 0.0012), pinZ(x, y, -HW - 0.0004, 0.0029, 0.0012)])));
   add('Seletor de tiro', 'dark', B.merge(pinZ(0.01, -0.03, -HW - 0.0006, 0.004, 0.0014), side([[0.008, -0.031], [0.02, -0.0335], [0.021, -0.0305], [0.009, -0.0285]], -HW - 0.0028, -HW - 0.0012, 0.0005)));
@@ -91,9 +92,9 @@ export function buildAR15(p: Params): WeaponPart[] {
   ];
   if (s(p, 'grip') === 'ergo') {
     // modern ergonomic grip: steeper angle, beavertail over the web of the hand, no finger nub, stippled panels
-    const ergo: V2[] = [[0.0168, 0], [0.016, -0.03], [0.0158, -0.07], [0.013, -0.094], [0.005, -0.103], [-0.009, -0.1], [-0.0175, -0.088], [-0.0215, -0.05], [-0.0225, -0.012], [-0.026, -0.002], [-0.028, 0.006], [-0.016, 0.006]];
+    const ergo: V2[] = [[0.0168, 0], [0.016, -0.03], [0.0158, -0.07], [0.013, -0.094], [0.005, -0.103], [-0.009, -0.1], [-0.0175, -0.088], [-0.0215, -0.05], [-0.0225, -0.016], [-0.029, -0.006], [-0.0305, 0.003], [-0.024, 0.009], [-0.012, 0.008]];
     const T0 = [T.at(0.006, -0.0405, 0), T.rz(-0.3)];
-    add('Empunhadura ergonômica', 'polymer', place(side(ergo, -0.0145, 0.0145, 0.0065, [], 3), ...T0));
+    add('Empunhadura ergonômica', 'polymer', place(side(ergo, -0.0145, 0.0145, 0.0045, [], 3), ...T0));
     const panel: V2[] = [[0.011, -0.022], [0.011, -0.082], [0.002, -0.092], [-0.012, -0.086], [-0.016, -0.05], [-0.016, -0.022]];
     add('Textura da empunhadura', 'grip', B.merge(place(side(panel, 0.0136, 0.0151, 0.0005, [], 1), ...T0), place(side(panel, -0.0151, -0.0136, 0.0005, [], 1), ...T0)));
   } else add('Empunhadura', 'polymer', place(side(gripLocal, -0.0138, 0.0138, 0.006, [], 3), T.at(0.006, -0.0405, 0), T.rz(-0.4)));
@@ -122,25 +123,92 @@ export function buildAR15(p: Params): WeaponPart[] {
     add('Trava da coronha', 'polymer', side([[xf - 0.006, -0.009], [xf - 0.05, -0.016], [xf - 0.052, -0.021], [xf - 0.008, -0.0145]], -0.005, 0.005, 0.0012));
   }
 
-  // ------------------------------------------------------------------ handguard (free float M-LOK)
-  const hx0 = 0.186;
-  const len = hgEnd - hx0;
-  const slots = Math.max(2, Math.floor((len - 0.04) / 0.04));
-  const slotHoles = (cy: number): V2[][] => Array.from({ length: slots }, (_, i) => B.roundedRect(0.032, 0.0072, 0.0035, 4, hx0 + 0.03 + i * ((len - 0.06) / Math.max(1, slots - 1)), cy));
-  const hgPanel: V2[] = B.roundedRect(len, 0.026, 0.001, 1, hx0 + len / 2, -0.004);
-  add('Guarda-mão (lado dir.)', 'anodized', side(hgPanel, 0.0198, 0.0224, 0.0007, slotHoles(-0.004), 1));
-  add('Guarda-mão (lado esq.)', 'anodized', side(hgPanel, -0.0224, -0.0198, 0.0007, slotHoles(-0.004), 1));
-  add('Guarda-mão (inferior)', 'anodized', top(B.roundedRect(len, 0.026, 0.001, 1, hx0 + len / 2, 0), -0.0262, -0.0236, 0.0007, slotHoles(0), 1));
-  add('Guarda-mão (topo)', 'anodized', alongX([[-0.0155, 0.0178], [0.0155, 0.0178], [0.0155, BORE_TO_DECK], [-0.0155, BORE_TO_DECK]], hx0, hgEnd, 0.0004));
-  const chamfer = (sz: number, sy: number): V2[] => [[sz * 0.0155, sy > 0 ? 0.0178 : -0.0236], [sz * 0.0155, sy > 0 ? BORE_TO_DECK : -0.0262], [sz * 0.0224, sy > 0 ? 0.009 : -0.017], [sz * 0.0198, sy > 0 ? 0.009 : -0.017]];
-  add('Guarda-mão (chanfros)', 'anodized', B.merge(...[[1, 1], [-1, 1], [1, -1], [-1, -1]].map(([a, b]) => alongX(chamfer(a, b), hx0, hgEnd, 0.0003))));
-  add('Trilho do guarda-mão', 'anodized', picatinny(hx0 + 0.001, hgEnd, BORE_TO_DECK));
-  add('Porca do cano', 'dark', tubeX([[0.0105, 0.18], [0.0175, 0.18], [0.0175, 0.192], [0.0105, 0.192]], 0, 0, 24));
+  const moe = s(p, 'handguard') === 'moe';
+  // carbine with a fixed A2 front sight base at the mid-length gas position
+  const fsbX = Math.min(0.15 + 0.255, muzzle - 0.085);
+  if (moe) {
+    // ---------------------------------------------------------------- polymer M-LOK handguard (MOE-type)
+    const x0 = 0.198;
+    const x1 = fsbX - 0.026;
+    const A = 0.0235; // half width
+    const Bh = 0.0255; // half height
+    const W = 0.0032; // wall
+    const N = 3.3; // superellipse exponent: rounded square
+    const cy = -0.0025;
+    const winR: [number, number] = [0.36, 0.82]; // right slot row (upper side)
+    const winL: [number, number] = [Math.PI - 0.82, Math.PI - 0.36];
+    const ring = (xa: number, xb: number, slot: boolean) => {
+      const pieces = [
+        // no bevel: segments butt together seamlessly; only the slot openings show edges
+        alongX(superSector(A, Bh, W, N, winR[1], winL[0], cy), xa, xb, 0),
+        alongX(superSector(A, Bh, W, N, winL[1], Math.PI * 2 + winR[0], cy), xa, xb, 0),
+      ];
+      if (!slot) pieces.push(alongX(superSector(A, Bh, W, N, winR[0], winR[1], cy, 6), xa, xb, 0), alongX(superSector(A, Bh, W, N, winL[0], winL[1], cy, 6), xa, xb, 0));
+      return pieces;
+    };
+    const len = x1 - x0;
+    const k = Math.max(2, Math.floor((len - 0.05) / 0.038));
+    const slotLen = 0.026;
+    const pitch = (len - 0.05) / k;
+    const pieces: ReturnType<typeof alongX>[] = [];
+    let x = x0;
+    for (let i = 0; i < k; i++) {
+      const sx = x0 + 0.03 + i * pitch;
+      pieces.push(...ring(x, sx, false), ...ring(sx, sx + slotLen, true));
+      x = sx + slotLen;
+    }
+    pieces.push(...ring(x, x1, false));
+    add('Guarda-mão de polímero (M-LOK)', 'polymer', B.merge(...pieces), 'auto', false);
+    // stippled grip panels on the lower sides
+    add('Textura do guarda-mão', 'grip', B.merge(
+      alongX(superSector(A + 0.0006, Bh + 0.0006, 0.0009, N, -0.85, -0.12, cy), x0 + 0.05, x1 - 0.02, 0.0003),
+      alongX(superSector(A + 0.0006, Bh + 0.0006, 0.0009, N, Math.PI + 0.12, Math.PI + 0.85, cy), x0 + 0.05, x1 - 0.02, 0.0003),
+    ), 'auto', false);
+    add('Anel do guarda-mão', 'dark', B.merge(
+      tubeX([[0.0105, 0.184], [0.0285, 0.184], [0.0292, 0.188], [0.0292, 0.194], [0.0275, x0 + 0.001], [0.0105, x0 + 0.001]], cy, 0, 40),
+      tubeX([[0.0102, x1 - 0.001], [0.0238, x1 - 0.001], [0.0238, x1 + 0.007], [0.0102, x1 + 0.009]], cy * 0.5, 0, 36),
+    ));
+    // ---------------------------------------------------------------- A2 front sight base
+    const fx = fsbX;
+    const wing: V2[] = [[fx - 0.017, 0.0105], [fx + 0.015, 0.0105], [fx + 0.0045, 0.057], [fx - 0.0045, 0.057]];
+    const win: V2[] = [[fx - 0.008, 0.0185], [fx + 0.0065, 0.0185], [fx + 0.0018, 0.0455], [fx - 0.0018, 0.0455]];
+    add('Massa de mira A2', 'dark', B.merge(
+      tubeX([[0.0076, fx - 0.017], [0.0132, fx - 0.017], [0.0132, fx + 0.015], [0.0076, fx + 0.015]], 0, 0, 32),
+      side(wing, 0.0058, 0.0099, 0.0008, [win]),
+      side(wing, -0.0099, -0.0058, 0.0008, [win]),
+      side([[fx - 0.016, 0.0105], [fx + 0.014, 0.0105], [fx + 0.009, 0.019], [fx - 0.011, 0.019]], -0.0099, 0.0099, 0.0012),
+      side([[fx - 0.0045, 0.054], [fx + 0.0045, 0.054], [fx + 0.004, 0.058], [fx - 0.004, 0.058]], -0.0099, 0.0099, 0.0006),
+      place(B.lathe([[0, 0], [0.0017, 0], [0.0017, 0.024], [0.0011, 0.03], [0, 0.0302]], 12), T.at(fx, 0.018, 0)),
+      side([[fx - 0.012, -0.007], [fx + 0.012, -0.007], [fx + 0.01, -0.021], [fx - 0.007, -0.022]], -0.0055, 0.0055, 0.0012),
+      side([[fx + 0.006, -0.0145], [fx + 0.032, -0.0145], [fx + 0.032, -0.0205], [fx + 0.006, -0.0215]], -0.0035, 0.0035, 0.0008),
+      B.tube(Array.from({ length: 13 }, (_, i) => {
+        const t = -0.2 + (i / 12) * (Math.PI + 0.4);
+        return [fx - 0.002 + Math.cos(t) * 0.0085, -0.023 - Math.sin(t) * 0.009, 0] as [number, number, number];
+      }), () => 0.0013, 10),
+      pinZ(fx - 0.008, 0.0, 0.0133, 0.0018, 0.0012),
+      pinZ(fx + 0.007, 0.0, 0.0133, 0.0018, 0.0012),
+    ));
+  } else {
+    // ---------------------------------------------------------------- free-float aluminium M-LOK handguard with top rail
+    const hx0 = 0.186;
+    const len = hgEnd - hx0;
+    const slots = Math.max(2, Math.floor((len - 0.04) / 0.04));
+    const slotHoles = (cy: number): V2[][] => Array.from({ length: slots }, (_, i) => B.roundedRect(0.032, 0.0072, 0.0035, 4, hx0 + 0.03 + i * ((len - 0.06) / Math.max(1, slots - 1)), cy));
+    const hgPanel: V2[] = B.roundedRect(len, 0.026, 0.001, 1, hx0 + len / 2, -0.004);
+    add('Guarda-mão (lado dir.)', 'anodized', side(hgPanel, 0.0198, 0.0224, 0.0007, slotHoles(-0.004), 1));
+    add('Guarda-mão (lado esq.)', 'anodized', side(hgPanel, -0.0224, -0.0198, 0.0007, slotHoles(-0.004), 1));
+    add('Guarda-mão (inferior)', 'anodized', top(B.roundedRect(len, 0.026, 0.001, 1, hx0 + len / 2, 0), -0.0262, -0.0236, 0.0007, slotHoles(0), 1));
+    add('Guarda-mão (topo)', 'anodized', alongX([[-0.0155, 0.0178], [0.0155, 0.0178], [0.0155, BORE_TO_DECK], [-0.0155, BORE_TO_DECK]], hx0, hgEnd, 0.0004));
+    const chamfer = (sz: number, sy: number): V2[] => [[sz * 0.0155, sy > 0 ? 0.0178 : -0.0236], [sz * 0.0155, sy > 0 ? BORE_TO_DECK : -0.0262], [sz * 0.0224, sy > 0 ? 0.009 : -0.017], [sz * 0.0198, sy > 0 ? 0.009 : -0.017]];
+    add('Guarda-mão (chanfros)', 'anodized', B.merge(...[[1, 1], [-1, 1], [1, -1], [-1, -1]].map(([a2, b2]) => alongX(chamfer(a2, b2), hx0, hgEnd, 0.0003))));
+    add('Trilho do guarda-mão', 'anodized', picatinny(hx0 + 0.001, hgEnd, BORE_TO_DECK));
+    add('Porca do cano', 'dark', tubeX([[0.0105, 0.18], [0.0175, 0.18], [0.0175, 0.192], [0.0105, 0.192]], 0, 0, 24));
+  }
 
   // ------------------------------------------------------------------ barrel, gas block, muzzle device
   const bore = 0.0029;
   add('Cano', 'dark', tubeX([[bore, 0.17], [0.0098, 0.17], [0.0098, 0.24], [0.0088, 0.26], [0.0085, 0.33], [0.0078, 0.36], [0.0078, muzzle - 0.06], [0.0072, muzzle - 0.058], [0.0072, muzzle - 0.012], [0.0068, muzzle - 0.011], [0.0068, muzzle], [bore + 0.0006, muzzle + 0.0004], [bore, muzzle]], 0, 0, 32));
-  add('Bloco de gases', 'dark', B.merge(side(B.roundedRect(0.024, 0.024, 0.003, 3, Math.min(0.355, hgEnd - 0.03), -0.0005), -0.0105, 0.0105, 0.0015), pinZ(Math.min(0.35, hgEnd - 0.035), 0.006, 0.0105, 0.0022, 0.0012), pinZ(Math.min(0.36, hgEnd - 0.025), 0.006, 0.0105, 0.0022, 0.0012)));
+  if (!moe) add('Bloco de gases', 'dark', B.merge(side(B.roundedRect(0.024, 0.024, 0.003, 3, Math.min(0.355, hgEnd - 0.03), -0.0005), -0.0105, 0.0105, 0.0015), pinZ(Math.min(0.35, hgEnd - 0.035), 0.006, 0.0105, 0.0022, 0.0012), pinZ(Math.min(0.36, hgEnd - 0.025), 0.006, 0.0105, 0.0022, 0.0012)));
   const fh0 = muzzle - 0.012;
   if (s(p, 'muzzle') === 'a2') {
     add('Quebra-chamas A2', 'dark', B.merge(
@@ -180,7 +248,7 @@ export function buildAR15(p: Params): WeaponPart[] {
   };
   const magTop = -0.03;
   const magLen = n(p, 'magLen');
-  const curve = 0.05 * (magLen / 0.17);
+  const curve = (steel ? 0.05 : 0.034) * (magLen / 0.17);
   for (let i = 0; i <= 10; i++) {
     const t = i / 10;
     const y = magTop - t * magLen;
@@ -189,8 +257,19 @@ export function buildAR15(p: Params): WeaponPart[] {
   }
   add('Carregador', steel ? 'anodized' : 'polymer', B.loft(magSections));
   const baseX = 0.099 + curve + 0.002;
-  add('Base do carregador', steel ? 'dark' : 'polymer', place(top(B.roundedRect(0.07, 0.0265, 0.004, 3, 0, 0), -0.003, 0.003, 0.0012), T.at(baseX, magTop - magLen - 0.002, 0), T.rz(-0.22)));
-  if (!steel) add('Janela do carregador', 'lens', side(B.roundedRect(0.006, 0.05, 0.003, 3, 0.07 + curve * 0.3, -0.105), -0.0116, 0.0116, 0.0004));
+  add('Base do carregador', steel ? 'dark' : 'polymer', place(top(B.roundedRect(0.066, 0.0262, 0.004, 3, 0, 0), -0.0032, 0.0032, 0.0012), T.at(baseX + 0.001, magTop - magLen - 0.0028, 0), T.rz(-0.04)));
+  if (!steel) {
+    // PMAG-type: textured waffle panels on both sides
+    const bumps = [];
+    for (let r = 0; r < 6; r++)
+      for (let c = 0; c < 3; c++) {
+        const t = 0.32 + r * 0.085;
+        const y = magTop - t * magLen;
+        const xx = 0.099 - 0.013 + c * 0.0125 + curve * t ** 1.6;
+        for (const z of [0.01125, -0.01125 - 0.0008]) bumps.push(side(B.roundedRect(0.0085, 0.0085, 0.0018, 2, xx, y), z, z + 0.0008, 0.0003, [], 1));
+      }
+    add('Textura do carregador', 'polymer', B.merge(...bumps));
+  }
 
   // ------------------------------------------------------------------ optics / sights
   const optic = s(p, 'optic');
@@ -256,7 +335,7 @@ export function buildAR15(p: Params): WeaponPart[] {
     const front = up
       ? B.merge(side([[fx - 0.008, deck], [fx + 0.008, deck], [fx + 0.004, deck + 0.026], [fx - 0.004, deck + 0.026]], -0.009, 0.009, 0.0012, [B.roundedRect(0.005, 0.012, 0.002, 2, fx, deck + 0.017)]), side(B.roundedRect(0.0016, 0.012, 0.0006, 1, fx, deck + 0.018), -0.0009, 0.0009, 0.0003, [], 1), side(B.roundedRect(0.02, 0.005, 0.0015, 2, fx, deck + 0.0025), -0.011, 0.011, 0.001))
       : side(B.roundedRect(0.024, 0.008, 0.0015, 2, fx, deck + 0.004), -0.011, 0.011, 0.0012);
-    add('Massa de mira (rebatível)', 'anodized', front);
+    if (!moe) add('Massa de mira (rebatível)', 'anodized', front);
   }
   return parts;
 }

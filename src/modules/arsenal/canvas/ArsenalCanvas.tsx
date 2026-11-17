@@ -46,7 +46,7 @@ function DramaticLighting() {
       </Environment>
       <mesh rotation-x={-Math.PI / 2} position={[0, -0.0008, 0]} receiveShadow>
         <planeGeometry args={[30, 30]} />
-        <meshStandardMaterial color="#0a0b0e" roughness={0.42} metalness={0.25} />
+        <meshStandardMaterial color="#0d0e11" roughness={0.88} metalness={0} />
       </mesh>
     </>
   );

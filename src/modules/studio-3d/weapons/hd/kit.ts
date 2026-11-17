@@ -135,3 +135,20 @@ export function serrations(x0: number, x1: number, count: number, y0: number, y1
 
 export { B, place, T };
 export type { V2 };
+
+/**
+ * Annular sector of a "superellipse" ring in the (z, y) plane — rounded-square tubes such as polymer
+ * handguards. Angle 0 = +Z (right side), counter-clockwise toward +Y (top).
+ */
+export function superSector(a: number, b: number, wall: number, n: number, t0: number, t1: number, cy = 0, steps?: number): V2[] {
+  const k = steps ?? Math.max(4, Math.round(((t1 - t0) / (Math.PI * 2)) * 48 * detail.rev));
+  const pt = (t: number, A: number, Bv: number): V2 => {
+    const c = Math.cos(t);
+    const s = Math.sin(t);
+    return [A * Math.sign(c) * Math.abs(c) ** (2 / n), cy + Bv * Math.sign(s) * Math.abs(s) ** (2 / n)];
+  };
+  const out: V2[] = [];
+  for (let i = 0; i <= k; i++) out.push(pt(t0 + ((t1 - t0) * i) / k, a, b));
+  for (let i = k; i >= 0; i--) out.push(pt(t0 + ((t1 - t0) * i) / k, a - wall, b - wall));
+  return out;
+}
