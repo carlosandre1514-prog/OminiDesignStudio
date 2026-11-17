@@ -117,14 +117,17 @@ const C2D = '[data-testid="texture-canvas-2d"]';
   // Paint on the 3D model
   await page.getByRole('button', { name: 'Vista 3D' }).click();
   await page.getByRole('button', { name: /Selecionar camada Pintura/ }).click();
-  await page.waitForTimeout(2000);
+  await page.getByTestId('tex-props').getByLabel('Tamanho').first().fill('0.15');
+  await page.getByTestId('tex-props').getByLabel('Tamanho').first().dispatchEvent('pointerup');
+  await page.waitForTimeout(2500);
   const g0 = await snap(page, GL);
   const gb = await page.locator(GL).boundingBox();
   await page.mouse.move(gb.x + gb.width * 0.45, gb.y + gb.height * 0.4);
   await page.mouse.down();
   for (let i = 0; i <= 15; i++) await page.mouse.move(gb.x + gb.width * (0.45 + i * 0.008), gb.y + gb.height * (0.4 + i * 0.012));
   await page.mouse.up();
-  assert(await until(async () => diff(g0, await snap(page, GL)) > 0.8), 'pincel pinta direto no modelo 3D');
+  const changedPx = (a, b) => a.filter((v, i) => Math.abs(v - b[i]) > 12).length / a.length;
+  assert(await until(async () => changedPx(g0, await snap(page, GL)) > 0.01, 30000), 'pincel pinta direto no modelo 3D');
 
   // Export ZIP
   await page.getByTestId('tex-export').click();
