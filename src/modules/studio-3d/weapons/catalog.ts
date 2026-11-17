@@ -857,7 +857,7 @@ const smgHD: WeaponType = {
   category: 'firearm',
   hd: true,
   description: 'Alta definição: receptor com nervuras, tubo e alavanca de armar, guarda-mão tropical, mira de tambor, grupo do gatilho de polímero, carregador curvo.',
-  nums: [num('magLen', 'Carregador', 0.14, 0.24, 0.19, 0.005), num('stockPos', 'Extensão da coronha', 0, 0.08, 0.04, 0.005)],
+  nums: [num('magLen', 'Carregador', 0.14, 0.24, 0.19, 0.005), num('stockPos', 'Extensão da coronha', 0, 0.13, 0.13, 0.005)],
   choices: [choice('stock', 'Coronha', [['retratil', 'Retrátil'], ['fixa', 'Fixa'], ['nenhuma', 'Sem coronha']])],
   finish: { steel: 'escuro', polymer: 'preto', grip: 'borracha', energy: 'vermelho', wear: 0.3 },
   build: (p) => buildSMG(p),
