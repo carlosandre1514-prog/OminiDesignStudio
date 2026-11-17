@@ -2,7 +2,12 @@ import type { Params, WeaponPart } from '../catalog';
 import { alongX, B, pinZ, place, serrations, side, T, tubeX, turnX, type V2 } from './kit';
 
 /**
- * Compact striker-fired 9 mm pistol, high detail (generic polymer-frame design, ~187 mm long).
+ * Glock 17 Gen5, from the manufacturer's data: slide 186 mm, overall 202 mm (frame tang 16 mm behind
+ * the slide), barrel 114 mm, slide width 25.5 mm, height with magazine 139 mm, trigger distance 70 mm
+ * (backstrap → trigger), sight radius 165 mm, grip angle ≈ 22°. Gen5 details: front + rear slide
+ * serrations, no finger grooves, flared magazine well, ambidextrous slide stop, single-slot rail,
+ * two frame pins (trigger + trigger housing; Gen5 dropped the locking-block pin), reversible magazine
+ * catch, blade-safety trigger, polymer U-notch rear sight and dot front sight.
  * The slide is split left/right so the ejection port is a real opening over the barrel hood;
  * the slide front has a real muzzle opening showing the barrel crown and recoil spring guide.
  */
@@ -67,53 +72,57 @@ export function buildPistolHD(p: Params): WeaponPart[] {
     const t = i / 12;
     const y = gy0 - t * gl;
     const bump = s(p, 'grooves') === 'sim' && t > 0.15 && t < 0.85 ? Math.max(0, Math.sin(((t - 0.15) / 0.7) * Math.PI * 3)) * 0.0018 : 0;
-    strap.push([0.05 - (y - gy0) * -dx + bump - 0.002, y]);
+    strap.push([0.04 - (y - gy0) * -dx + bump - 0.002, y]);
   }
   const frameOutline: V2[] = [
     [0.012, bot - 0.0003],
     [front - 0.004, bot - 0.0003],
     [front - 0.004, -0.024],
-    [0.124, -0.0255],
-    [0.118, -0.0285],
-    [0.114, -0.044],
-    [0.108, -0.051],
-    [0.094, -0.0535],
-    [0.064, -0.0535],
-    [0.056, -0.047],
-    [0.053, gy0 - 0.004],
+    [0.122, -0.0255],
+    [0.104, -0.0285],
+    [0.1, -0.044],
+    [0.094, -0.051],
+    [0.08, -0.0535],
+    [0.05, -0.0535],
+    [0.042, -0.047],
+    [0.04, gy0 - 0.004],
     ...strap.slice(1),
-    [0.05 - gl * dx - 0.004, gy1 - 0.001],
+    [0.04 - gl * dx - 0.004, gy1 - 0.001],
     [0.012 - gl * dx - 0.006, gy1 - 0.001],
     [0.006 - gl * dx - 0.007, gy1 + 0.004],
     [0.004 - (gl * 0.15) * dx - 0.006, gy0 - gl * 0.15],
     [0.002, -0.024],
-    [-0.008, -0.019],
-    [-0.006, -0.0155],
+    [-0.014, -0.0185],
+    [-0.0125, -0.0155],
     [0.004, bot - 0.0003],
   ];
-  const guardHole: V2[] = [[0.066, -0.028], [0.108, -0.028], [0.11, -0.04], [0.104, -0.0475], [0.07, -0.048], [0.06, -0.04]];
+  const guardHole: V2[] = [[0.052, -0.028], [0.094, -0.028], [0.096, -0.04], [0.09, -0.0475], [0.056, -0.048], [0.046, -0.04]];
   add('Armação', 'polymer', side(frameOutline, -0.0118, 0.0118, 0.003, [guardHole], 3));
-  add('Trilho da armação', 'polymer', B.merge(...[0.132, 0.142, 0.152].map((x) => side(B.roundedRect(0.005, 0.003, 0.0006, 1, x, -0.0255), -0.0105, 0.0105, 0.0004, [], 1))));
+  // Glock universal rail: rails on both sides of the dust cover with a single cross slot
+  add('Trilho da armação', 'polymer', B.merge(...[[0.112, 0.131], [0.137, 0.162]].map(([a, b]) => side([[a, -0.0232], [b, -0.0232], [b, -0.0262], [a, -0.0262]], -0.0108, 0.0108, 0.0005, [], 1))));
   // grip texture panels (stippled)
   const panel: V2[] = [
-    [0.044 + 0.002, gy0 - 0.006],
-    [0.046 - gl * 0.85 * dx, gy0 - gl * 0.88],
+    [0.034 + 0.002, gy0 - 0.006],
+    [0.036 - gl * 0.85 * dx, gy0 - gl * 0.88],
     [0.012 - gl * 0.85 * dx, gy0 - gl * 0.88],
     [0.008 - 0.004, gy0 - 0.006],
   ];
   add('Textura da empunhadura', 'grip', B.merge(side(panel, 0.0115, 0.0124, 0.0004, [], 1), side(panel, -0.0124, -0.0115, 0.0004, [], 1)));
+  // Gen5 flared magazine well (front of the grip base)
+  const flare: V2[] = [[0.04 - gl * dx - 0.0045, gy1 - 0.001], [0.04 - gl * 0.88 * dx - 0.002, gy1 + gl * 0.12], [0.03 - gl * 0.88 * dx, gy1 + gl * 0.12], [0.03 - gl * dx - 0.002, gy1 - 0.001]];
+  add('Boca alargada do carregador', 'polymer', side(flare, -0.0128, 0.0128, 0.0012, [], 2));
 
   // ------------------------------------------------------------------ controls
-  add('Gatilho', 'polymer', side([[0.084, -0.028], [0.088, -0.028], [0.0885, -0.035], [0.086, -0.042], [0.081, -0.045], [0.083, -0.038], [0.0835, -0.032]], -0.0028, 0.0028, 0.0005));
-  add('Tecla de segurança', 'dark', side([[0.0845, -0.034], [0.0865, -0.034], [0.085, -0.0415], [0.0832, -0.0415]], -0.0007, 0.0007, 0.0002));
-  add('Retém do ferrolho', 'dark', side([[0.094, -0.0135], [0.108, -0.0135], [0.109, -0.0165], [0.095, -0.0165]], -0.0128, -0.0116, 0.0004));
-  add('Alavanca de desmontagem', 'dark', B.merge(side(B.roundedRect(0.008, 0.0045, 0.001, 2, 0.118, -0.0165), 0.0114, 0.0124, 0.0003), side(B.roundedRect(0.008, 0.0045, 0.001, 2, 0.118, -0.0165), -0.0124, -0.0114, 0.0003)));
-  add('Botão do carregador', 'polymer', B.merge(side(B.roundedRect(0.006, 0.006, 0.0015, 2, 0.056, -0.034), -0.0127, -0.011, 0.0005)));
-  add('Pinos da armação', 'dark', B.merge(...[[0.102, -0.018], [0.03, -0.021]].flatMap(([x, y]) => [pinZ(x, y, 0.0119, 0.0016, 0.0006), pinZ(x, y, -0.0119, 0.0016, 0.0006)])));
+  add('Gatilho', 'polymer', side([[0.07, -0.028], [0.074, -0.028], [0.0745, -0.035], [0.072, -0.042], [0.067, -0.045], [0.069, -0.038], [0.0695, -0.032]], -0.0028, 0.0028, 0.0005));
+  add('Tecla de segurança', 'dark', side([[0.0705, -0.034], [0.0725, -0.034], [0.071, -0.0415], [0.0692, -0.0415]], -0.0007, 0.0007, 0.0002));
+  add('Retém do ferrolho (ambidestro)', 'dark', B.merge(...[1, -1].map((sg) => side([[0.08, -0.0135], [0.096, -0.0135], [0.097, -0.0168], [0.081, -0.0168]], sg > 0 ? 0.0116 : -0.0128, sg > 0 ? 0.0128 : -0.0116, 0.0004))));
+  add('Alavanca de desmontagem', 'dark', B.merge(side(B.roundedRect(0.008, 0.0045, 0.001, 2, 0.104, -0.0165), 0.0114, 0.0124, 0.0003), side(B.roundedRect(0.008, 0.0045, 0.001, 2, 0.104, -0.0165), -0.0124, -0.0114, 0.0003)));
+  add('Botão do carregador', 'polymer', B.merge(side(B.roundedRect(0.006, 0.006, 0.0015, 2, 0.043, -0.034), -0.0127, -0.011, 0.0005)));
+  add('Pinos da armação', 'dark', B.merge(...[[0.07, -0.019], [0.012, -0.0195]].flatMap(([x, y]) => [pinZ(x, y, 0.0119, 0.0016, 0.0006), pinZ(x, y, -0.0119, 0.0016, 0.0006)])));
 
   // ------------------------------------------------------------------ magazine baseplate
-  const bx = 0.03 - gl * dx;
-  add('Base do carregador', 'polymer', place(side(B.roundedRect(0.042, 0.0065, 0.002, 2, 0, 0), -0.0118, 0.0118, 0.0018), T.at(bx, gy1 - 0.0045, 0), T.rz(-g * 0.4)));
+  const bx = 0.022 - gl * dx;
+  add('Base do carregador', 'polymer', place(side(B.roundedRect(0.036, 0.0065, 0.002, 2, 0, 0), -0.0118, 0.0118, 0.0018), T.at(bx, gy1 - 0.0045, 0), T.rz(-g * 0.4)));
   if (s(p, 'light') === 'sim')
     add('Lanterna tática', 'anodized', B.merge(side(B.roundedRect(0.06, 0.018, 0.004, 3, 0.14, -0.037), -0.0125, 0.0125, 0.003), turnX([[0, 0.168], [0.0105, 0.168], [0.0105, 0.172], [0, 0.172]], -0.037, 0, 24)));
   if (s(p, 'light') === 'sim') add('Lente da lanterna', 'lens', turnX([[0, 0.1715], [0.009, 0.1715], [0.009, 0.1725], [0, 0.1725]], -0.037, 0, 24));

@@ -791,11 +791,11 @@ const ar15: WeaponType = {
 
 const pistolHD: WeaponType = {
   id: 'pistol-hd',
-  name: 'Pistola 9mm (HD)',
+  name: 'Pistola Glock 17 (HD)',
   category: 'firearm',
   hd: true,
-  description: 'Alta definição: ferrolho com janela de ejeção e boca reais, serrilhas, miras com pontos luminosos, armação de polímero com trilho e textura.',
-  nums: [num('slide', 'Comprimento do ferrolho', 0.165, 0.205, 0.185, 0.005), num('grip', 'Ângulo da empunhadura (°)', 16, 24, 21, 1, '°'), num('gripLen', 'Altura da empunhadura', 0.07, 0.1, 0.082, 0.002)],
+  description: 'Glock 17 Gen5 pelos dados da fabricante: ferrolho 186 mm, total 202 mm, cano 114 mm, altura 139 mm, distância do gatilho 70 mm; serrilhas frontais, sem apoio de dedos, boca do carregador alargada, retém ambidestro, trilho de 1 fenda, 2 pinos.',
+  nums: [num('slide', 'Comprimento do ferrolho', 0.165, 0.205, 0.186, 0.001), num('grip', 'Ângulo da empunhadura (°)', 16, 24, 22, 1, '°'), num('gripLen', 'Altura da empunhadura', 0.07, 0.1, 0.08, 0.002)],
   choices: [
     choice('serr', 'Serrilhas', [['frente', 'Traseiras + frontais'], ['tras', 'Só traseiras'], ['nao', 'Sem serrilhas']]),
     choice('grooves', 'Apoio dos dedos', YESNO, 'nao'),
@@ -811,7 +811,7 @@ const akHD: WeaponType = {
   name: 'Fuzil AK-47 (HD)',
   category: 'firearm',
   hd: true,
-  description: 'Alta definição: caixa estampada com rebites, tampa com nervuras, seletor longo, guarda-mãos de madeira, massa de mira com orelhas, carregador banana curvo.',
+  description: 'AKM real: 880 mm, cano de 415 mm, raio de mira 378 mm; receptor estampado de 1 mm com rebites (3+3 no munhão dianteiro, 2+2 no traseiro, 5 no guarda-mato), covinhas guia, 3 pinos, tampa nervurada, alça tangente, bloco de gás 45°, massa de mira com orelhas e baioneta, compensador inclinado, carregador 232 × 64 × 32 mm.',
   nums: [num('barrel', 'Cano', 0.3, 0.45, 0.415, 0.005), num('magLen', 'Carregador', 0.15, 0.24, 0.205, 0.005)],
   choices: [
     choice('furniture', 'Madeira / polímero', [['madeira', 'Madeira'], ['polimero', 'Polímero']]),
