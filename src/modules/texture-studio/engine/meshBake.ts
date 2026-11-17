@@ -124,7 +124,7 @@ export function bakeMesh(pos: Float32Array, uv: Float32Array, size = 1024, gutte
     vcn[a]++;
     vcn[b]++;
   }
-  // curvature × size: a sphere ≈ 3.5, a finger on a 2 m character ≈ 200
+  // curvature × size: a sphere ≈ 3.5, a gun grip ≈ 60, a finger on a 2 m character ≈ 250
   for (let i = 0; i < count; i++) vc[i] = vcn[i] ? (vc[i] / vcn[i]) * diag : 0;
 
   // ---------------------------------------------------------------- rasterise in UV space
@@ -238,7 +238,7 @@ export function bakeMesh(pos: Float32Array, uv: Float32Array, size = 1024, gutte
     if (!cover[i]) continue;
     data[i * 4] = Math.max(0, 1 - dv[i] / wear) * 255;
     data[i * 4 + 1] = Math.max(0, 1 - dc[i] / wear) * 255;
-    data[i * 4 + 2] = Math.max(0, Math.min(1, 0.5 + conv[i] / 40)) * 255;
+    data[i * 4 + 2] = Math.max(0, Math.min(1, 0.5 + conv[i] / 250)) * 255;
     data[i * 4 + 3] = 255;
   }
   return { size, cover, pos: tpos, nor: tnor, curvature: { width: size, height: size, data }, diag, wear };

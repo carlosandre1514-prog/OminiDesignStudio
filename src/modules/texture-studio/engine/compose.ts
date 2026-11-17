@@ -235,7 +235,7 @@ function layerMask(layer: Layer, size: number, height: Float32Array, bitmaps: Bi
         for (let i = 0; i < N; i++) {
           const edge = 1 - smooth(a * 0.45, a, 1 - (m.side === 'concave' ? mesh.concave[i] : mesh.convex[i]));
           const c = m.side === 'concave' ? 1 - mesh.vertex[i] : mesh.vertex[i];
-          const vert = smooth(0.66 - a * 0.12, 0.86 - a * 0.12, c);
+          const vert = smooth(0.76 - a * 0.12, 0.96 - a * 0.12, c);
           // the texture relief only adds a little: on a model the real geometry leads
           out[i] = Math.max(out[i] * 0.35, edge, vert);
         }

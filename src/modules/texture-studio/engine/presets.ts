@@ -200,7 +200,7 @@ export const PRESETS: Preset[] = [
   // ------------------------------------------------------------ skin & characters
   { id: 'skin-light', name: 'Pele clara (sardas)', group: 'Pele e personagens', surface: 'skin', build: () => skin(['#e2b49c', '#f0c8b2'], '#e08a80', 0.55, '#b27552') },
   { id: 'skin-medium', name: 'Pele morena', group: 'Pele e personagens', surface: 'skin', build: () => skin(['#b07a58', '#c48d68'], '#c26a5c', 0.25, '#7a4a30') },
-  { id: 'skin-dark', name: 'Pele negra', group: 'Pele e personagens', surface: 'skin', build: () => skin(['#5e3b2a', '#714733'], '#8a3d33', 0.15, '#3a2219') },
+  { id: 'skin-dark', name: 'Pele negra', group: 'Pele e personagens', surface: 'skin', build: () => skin(['#5a3a2b', '#6b4535'], '#a06a5c', 0.15, '#3a2219') },
   {
     id: 'skin-aged',
     name: 'Pele envelhecida (rugas)',
