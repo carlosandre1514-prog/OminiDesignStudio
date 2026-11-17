@@ -176,7 +176,7 @@ const CameraRig = forwardRef<CameraApi, { autoRotate: boolean }>(function Camera
   const camera = useThree((s) => s.camera) as THREE.PerspectiveCamera;
   const parts = useArsenal((s) => s.parts);
 
-  const frame = () => {
+  const frame = (dirOverride?: [number, number, number]) => {
     const root = exportRoot.current;
     const c = controls.current;
     if (!root || !c) return;
@@ -185,7 +185,7 @@ const CameraRig = forwardRef<CameraApi, { autoRotate: boolean }>(function Camera
     if (box.isEmpty()) return;
     const sphere = box.getBoundingSphere(new THREE.Sphere());
     // Exact fit: distance at which all 8 box corners are inside the view frustum (long guns fill the screen).
-    const dir = new THREE.Vector3(...VIEW_DIRS[currentView]).normalize();
+    const dir = new THREE.Vector3(...(dirOverride ?? VIEW_DIRS[currentView])).normalize();
     const fwd = dir.clone().negate();
     const upRef = Math.abs(dir.y) > 0.99 ? new THREE.Vector3(0, 0, -1) : new THREE.Vector3(0, 1, 0);
     camera.up.set(0, 1, 0);
@@ -214,23 +214,32 @@ const CameraRig = forwardRef<CameraApi, { autoRotate: boolean }>(function Camera
 
   useEffect(() => {
     // wait one frame so the meshes of the new parts exist
-    const id = requestAnimationFrame(frame);
+    const id = requestAnimationFrame(() => frame());
     return () => cancelAnimationFrame(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [parts]);
 
   useEffect(() => {
     if (!bridge.current) return;
-    bridge.current.frameFor = (aspect: number) => {
+    bridge.current.frameFor = (aspect: number, dir?: [number, number, number]) => {
       const c = controls.current;
       const pos = camera.position.clone();
+      const quat = camera.quaternion.clone();
       const target = c?.target.clone();
       const prev = camera.aspect;
       camera.aspect = aspect;
-      frame();
+      frame(dir);
+      if (dir) {
+        // orthographic-style views: look straight at the centre (top/bottom keep the muzzle to the right)
+        const up = Math.abs(dir[1]) > 0.99 ? new THREE.Vector3(0, 0, dir[1] > 0 ? -1 : 1) : new THREE.Vector3(0, 1, 0);
+        camera.up.copy(up);
+        camera.lookAt(c?.target ?? new THREE.Vector3());
+        camera.up.set(0, 1, 0);
+      }
       camera.aspect = prev;
       return () => {
         camera.position.copy(pos);
+        camera.quaternion.copy(quat);
         if (c && target) {
           c.target.copy(target);
           c.update();

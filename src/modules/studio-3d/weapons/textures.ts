@@ -91,7 +91,7 @@ export function materialFor(slot: Slot, f: Finish): MaterialSpec {
       return { key: `trim-${f.trim}`, name: FINISH_LABELS.trim.options[f.trim], color: '#ffffff', metalness: 1, roughness: 1, pattern: { kind: 'hammered', dark, light, rough: [0.2, 0.45], wear: w, seed: 31 } };
     }
     case 'wood': {
-      const pal: Record<Finish['wood'], [RGB, RGB]> = { carvalho: [[88, 44, 24], [146, 82, 44]], nogueira: [[58, 34, 20], [124, 80, 48]], ebano: [[18, 14, 12], [58, 44, 36]], freixo: [[160, 126, 88], [226, 196, 150]] };
+      const pal: Record<Finish['wood'], [RGB, RGB]> = { carvalho: [[62, 28, 17], [112, 54, 32]], nogueira: [[58, 34, 20], [124, 80, 48]], ebano: [[18, 14, 12], [58, 44, 36]], freixo: [[160, 126, 88], [226, 196, 150]] };
       const [dark, light] = pal[f.wood];
       return { key: `wood-${f.wood}`, name: FINISH_LABELS.wood.options[f.wood], color: '#ffffff', metalness: 0, roughness: 1, pattern: { kind: 'wood', dark, light, rough: [0.45, 0.75], wear: w, seed: 41 } };
     }

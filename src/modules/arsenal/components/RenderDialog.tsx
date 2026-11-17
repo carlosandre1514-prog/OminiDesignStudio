@@ -5,7 +5,7 @@ import { downloadBlob } from '@/core/utils/download';
 import { slugify } from '@/core/utils/sanitize';
 import { toast } from '@/ui/toast';
 import { SCENE_LABELS, type SceneLook } from '../canvas/ArsenalCanvas';
-import { ASPECTS, canvasToBlob, renderSize, renderStill, RESOLUTIONS, type Aspect, type Resolution } from '../canvas/renderImage';
+import { ASPECTS, canvasToBlob, renderSheet, renderSize, renderStill, RESOLUTIONS, type Aspect, type Resolution } from '../canvas/renderImage';
 import { useArsenal, weaponById } from '../store';
 import { Btn, Segmented, useProfile } from './ui';
 
@@ -14,6 +14,7 @@ export function RenderDialog({ onClose }: { onClose: () => void }) {
   const p = useProfile();
   const { scene, render, status } = useArsenal(useShallow((s) => ({ scene: s.scene, render: s.render, status: s.status })));
   const [format, setFormat] = useState<'jpg' | 'png'>('jpg');
+  const [kind, setKind] = useState<'imagem' | 'folha'>('imagem');
   const [progress, setProgress] = useState<number | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const st = useArsenal.getState;
@@ -24,18 +25,22 @@ export function RenderDialog({ onClose }: { onClose: () => void }) {
     if (status.kind === 'busy') return toast.info('Aguarde a malha terminar de ser gerada.');
     setProgress(0);
     try {
-      const c = await renderStill({ ...size, vignette: scene === 'dramatico' ? 0.55 : scene === 'estudio' ? 0.25 : 0, reframe: true, onProgress: setProgress });
-      const blob = await canvasToBlob(c, format === 'png' ? 'image/png' : 'image/jpeg', 0.93);
       const s = st();
-      const base = slugify(s.source === 'image' ? s.imageName : weaponById(s.weaponId).name, 'arma');
-      downloadBlob(blob, `${base}-${RESOLUTIONS[render.res].label.replace(/\s/g, '')}-${render.aspect.replace(':', 'x')}.${format}`);
+      const name = s.source === 'image' ? s.imageName : weaponById(s.weaponId).name;
+      const base = slugify(name, 'arma');
+      const c =
+        kind === 'folha'
+          ? await renderSheet({ width: Math.max(size.width, size.height), title: `${name.replace(/\s*\(HD\)/, '').toUpperCase()} — DESIGN REFERENCE SHEET · ALL ANGLES`, onProgress: setProgress })
+          : await renderStill({ ...size, vignette: scene === 'dramatico' ? 0.55 : scene === 'estudio' ? 0.25 : 0, reframe: true, onProgress: setProgress });
+      const blob = await canvasToBlob(c, format === 'png' ? 'image/png' : 'image/jpeg', 0.93);
+      downloadBlob(blob, kind === 'folha' ? `${base}-folha-de-referencia-${RESOLUTIONS[render.res].label.replace(/\s/g, '')}.${format}` : `${base}-${RESOLUTIONS[render.res].label.replace(/\s/g, '')}-${render.aspect.replace(':', 'x')}.${format}`);
       // small preview (keeps memory low)
       const t = document.createElement('canvas');
       t.width = 640;
-      t.height = Math.round((640 * size.height) / size.width);
+      t.height = Math.round((640 * c.height) / c.width);
       t.getContext('2d')!.drawImage(c, 0, 0, t.width, t.height);
       setPreview(t.toDataURL('image/jpeg', 0.85));
-      toast.success(`Render ${size.width}×${size.height} salvo (${(blob.size / 1048576).toFixed(1)} MB)`);
+      toast.success(`Render ${c.width}×${c.height} salvo (${(blob.size / 1048576).toFixed(1)} MB)`);
     } catch (e) {
       toast.error(`Falha no render: ${e instanceof Error ? e.message : e}`);
     } finally {
@@ -54,9 +59,10 @@ export function RenderDialog({ onClose }: { onClose: () => void }) {
           </button>
         </div>
         <div className="space-y-3">
+          <Segmented label="Tipo" value={kind} options={[{ id: 'imagem', label: 'Imagem' }, { id: 'folha', label: 'Folha de referência (6 vistas)' }]} onChange={(v) => setKind(v as 'imagem' | 'folha')} />
           <Segmented<SceneLook> label="Cena / iluminação" value={scene} options={(Object.keys(SCENE_LABELS) as SceneLook[]).map((id) => ({ id, label: SCENE_LABELS[id] }))} onChange={(v) => st().set({ scene: v })} />
           <Segmented<Resolution> label="Resolução" value={render.res} options={(Object.keys(RESOLUTIONS) as Resolution[]).map((id) => ({ id, label: RESOLUTIONS[id].label }))} onChange={(v) => st().set({ render: { ...render, res: v } })} />
-          <Segmented<Aspect> label="Proporção" value={render.aspect} options={(Object.keys(ASPECTS) as Aspect[]).map((id) => ({ id, label: id }))} onChange={(v) => st().set({ render: { ...render, aspect: v } })} />
+          {kind === 'imagem' && <Segmented<Aspect> label="Proporção" value={render.aspect} options={(Object.keys(ASPECTS) as Aspect[]).map((id) => ({ id, label: id }))} onChange={(v) => st().set({ render: { ...render, aspect: v } })} />}
           <Segmented label="Formato" value={format} options={[{ id: 'jpg', label: 'JPEG (menor)' }, { id: 'png', label: 'PNG (sem perdas)' }]} onChange={(v) => setFormat(v as 'jpg' | 'png')} />
           <p className="text-xs text-zinc-400">
             {size.width} × {size.height} px · renderizado em blocos pela GPU do aparelho.

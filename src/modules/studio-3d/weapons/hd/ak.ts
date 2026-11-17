@@ -1,5 +1,5 @@
 import type { Params, WeaponPart } from '../catalog';
-import { alongX, B, grip, pinZ, place, sector, side, T, top, tubeX, turnX, type GripShape, type V2 } from './kit';
+import { alongX, B, grip, gripPanels, pinZ, place, sector, side, T, top, tubeX, turnX, type GripShape, type V2 } from './kit';
 
 /**
  * AKM (the modernised AK-47, the "AK" of most games and films), built from its own reference data:
@@ -60,6 +60,12 @@ export function buildAK(p: Params): WeaponPart[] {
   // trigger group pins (heads on both sides): hammer, trigger, hammer release (AKM rate reducer)
   const pins: [number, number][] = [[0.147, -0.022], [0.118, -0.025], [0.133, -0.013]];
   add('Pinos do mecanismo', 'dark', B.merge(...pins.flatMap(([x, y]) => [pinZ(x, y, HW + 0.0003, 0.0024, 0.0007, 14), pinZ(x, y, -HW - 0.0003, 0.0024, 0.0007, 14)])));
+  // side optics mount rail on the left wall (dovetail plate, 3 rivets)
+  add('Trilho lateral (luneta)', 'dark', B.merge(
+    side([[0.098, -0.0175], [0.205, -0.0175], [0.207, -0.0145], [0.207, 0.0], [0.205, 0.003], [0.098, 0.003], [0.096, 0.0], [0.096, -0.0145]], -HW - 0.0028, -HW + 0.0002, 0.0007),
+    side([[0.104, -0.002], [0.198, -0.002], [0.198, 0.0018], [0.104, 0.0018]], -HW - 0.0042, -HW - 0.0026, 0.0004),
+    ...[0.11, 0.152, 0.194].map((x) => rivet(x, -0.0105, -HW - 0.0028, 0.0021, 0.0009)),
+  ));
   // dust cover: rounded, with the AKM's transverse stiffening ribs and the recoil-spring button at the rear
   const cover: V2[] = [];
   for (let i = 0; i <= 14; i++) {
@@ -154,7 +160,8 @@ export function buildAK(p: Params): WeaponPart[] {
   }
   lower.push([0.0205, 0.0075], [-0.0205, 0.0075]);
   add('Guarda-mão inferior', furn, alongX(lower, RX + 0.002, lgEnd, 0.004, [], 2));
-  add('Sulcos do guarda-mão', furn, B.merge(...[-1, 1].map((sz) => side(B.roundedRect(lgEnd - RX - 0.05, 0.0045, 0.002, 3, (RX + lgEnd) / 2, -0.004), sz > 0 ? 0.0203 : -0.0216, sz > 0 ? 0.0216 : -0.0203, 0.0006))), 'auto', false);
+  // the AKM lower handguard's side ledges (finger rests)
+  add('Ressaltos do guarda-mão', furn, B.merge(...[-1, 1].map((sz) => side(B.roundedRect(lgEnd - RX - 0.055, 0.0065, 0.003, 3, (RX + lgEnd) / 2 + 0.004, -0.003), sz > 0 ? 0.02 : -0.0228, sz > 0 ? 0.0228 : -0.02, 0.0012))), 'auto', false);
   add('Retém do guarda-mão', 'dark', B.merge(
     tubeX([[0.0212, lgEnd], [0.0232, lgEnd], [0.0232, lgEnd + 0.011], [0.0212, lgEnd + 0.011]], -0.004, 0, 24),
     // the retainer lever on the right
@@ -184,6 +191,7 @@ export function buildAK(p: Params): WeaponPart[] {
     taperFront: 0.35,
   };
   add('Empunhadura', wood ? 'wood' : 'polymer', place(grip(akGrip, 0.006), T.at(0.058, BOT, 0), T.rz(-0.32)), 'smooth');
+  add('Quadriculado da empunhadura', 'grip', place(gripPanels(akGrip, -0.022, -0.086, Math.PI / 2 + 0.08, 0.85, 0.0005), T.at(0.058, BOT, 0), T.rz(-0.32)), 'smooth', false);
   add('Parafuso da empunhadura', 'dark', place(B.lathe([[0, 0], [0.0045, 0], [0.0045, 0.0015], [0, 0.0018]], 14), T.at(0.058 - 0.098 * Math.sin(0.32) + 0.0, BOT - 0.098 * Math.cos(0.32) - 0.0005, 0), T.rz(-0.32), T.rx(Math.PI)));
 
   // ------------------------------------------------------------------ stock
@@ -213,11 +221,13 @@ export function buildAK(p: Params): WeaponPart[] {
     const pts: V2[] = [];
     const hx = 0.03;
     const hz = 0.0148;
-    // two pressed ribs per side, near the front and rear edges
-    const rib = (x: number) => (Math.abs(x + 0.017) < 0.0035 || Math.abs(x - 0.014) < 0.0035 ? 0.0009 : 0);
-    for (let i = 0; i <= 16; i++) pts.push([-hx + (2 * hx * i) / 16, -hz - rib(-hx + (2 * hx * i) / 16)]);
+    // four long pressed ribs per side, following the curve (AKM "ribbed" steel magazine)
+    const ribs = [-0.019, -0.0075, 0.004, 0.0155];
+    const rib = (x: number) => (ribs.some((c) => Math.abs(x - c) < 0.0022) ? 0.0012 : 0);
+    const k = 48;
+    for (let i = 0; i <= k; i++) pts.push([-hx + (2 * hx * i) / k, -hz - rib(-hx + (2 * hx * i) / k)]);
     pts.push([hx + 0.002, -hz + 0.004], [hx + 0.0028, 0], [hx + 0.002, hz - 0.004]);
-    for (let i = 16; i >= 0; i--) pts.push([-hx + (2 * hx * i) / 16, hz + rib(-hx + (2 * hx * i) / 16)]);
+    for (let i = k; i >= 0; i--) pts.push([-hx + (2 * hx * i) / k, hz + rib(-hx + (2 * hx * i) / k)]);
     pts.push([-hx - 0.001, hz - 0.003], [-hx - 0.001, -hz + 0.003]);
     return pts;
   };

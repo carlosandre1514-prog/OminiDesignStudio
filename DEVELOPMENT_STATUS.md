@@ -117,6 +117,13 @@ _Última atualização: 2026-11-14 (Fase 4 — 3D Design Studio)_
 - **AR-15 configurado como a referência** (carabina com guarda-mão de polímero M-LOK arredondado, massa de mira A2, cano de 16", PMAG texturizado, alça traseira levantada, guarda-mato grande); a versão free-float de alumínio continua disponível.
 - Texturas de perto mais limpas: pontilhado de borracha sem "chuvisco" preto e branco, riscos de desgaste só na cor/rugosidade (sem vincos no relevo) e sujeira com menos manchas de brilho.
 
+### ✅ Cada arma com a sua própria referência
+- **AKM:** a AK foi refeita com as medidas reais. Antes tinha cerca de 1,06 m; agora tem 880 mm, com os rebites, pinos, miras, bloco de gás de 45°, trilho lateral e carregador nervurado da AKM.
+- **Glock 17 Gen5:** seguindo os dados da fabricante.
+- **Outras armas longas:** M24, Remington 870 e MP5A3 conferidas e corrigidas pelas medidas reais.
+- Detalhes e fontes em `docs/REFERENCIAS.md`.
+- **Folha de referência (6 vistas)** no diálogo de render do Arsenal.
+
 ### ✅ Arma fiel à referência: prompt + imagem
 - **Arsenal → Imagem → 3D → Referência (modelo fiel)**: a foto da arma (pode estar inclinada) é recortada (IA no aparelho ou fundo liso), endireitada (eixo principal + linha do cano) e virada com o cano à direita.
 - O Omini escolhe o tipo e ajusta cano, guarda-mão, coronha, ótica, carregador e bocal até a silhueta e o contorno baterem com a foto. Ele mostra a comparação (ciano = foto, laranja = modelo) e a porcentagem de semelhança. A cor do acabamento vem da foto.
