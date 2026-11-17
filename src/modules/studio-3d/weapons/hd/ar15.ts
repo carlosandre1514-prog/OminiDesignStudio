@@ -106,7 +106,46 @@ export function buildAR15(p: Params): WeaponPart[] {
   }
   add('Tubo do amortecedor', 'dark', B.merge(turnX([[0, -0.192], [0.0136, -0.19], [0.0146, -0.186], [0.0146, -0.012], [0.0146, 0]], 0.0035, 0, 32), tubeX([[0.0146, -0.012], [0.018, -0.012], [0.018, -0.004], [0.0146, -0.004]], 0.0035, 0, 12)));
   add('Placa traseira', 'dark', side([[-0.0135, -0.013], [-0.0115, -0.013], [-0.0115, 0.02], [-0.0135, 0.02]], -0.014, 0.014, 0.0005));
-  if (s(p, 'stock') !== 'nenhuma') {
+  const stockKind = s(p, 'stock');
+  if (stockKind === 'bcm') {
+    // BCM Gunfighter-type stock (as on the Springfield Saint): boxy sleeve around the buffer tube,
+    // vertical step down to a flat-bottomed body, triangular toe with sling slot + QD socket,
+    // recessed side panels and a rubber butt pad. Side profile measured from the reference photo.
+    const pos = n(p, 'stockPos');
+    const xf = -0.055 - pos;
+    const L = 0.165;
+    const X = (u: number) => xf - u;
+    const top = 0.0195;
+    // short sleeve, then the lower body starts ~3.5 cm behind the front and runs to the toe
+    const profile: V2[] = [
+      [X(0), top - 0.004],
+      [X(0.002), -0.0165],
+      [X(0.006), -0.0205],
+      [X(0.026), -0.0205],
+      [X(0.032), -0.025],
+      [X(0.037), -0.055],
+      [X(0.043), -0.06],
+      [X(0.118), -0.066],
+      [X(L - 0.006), -0.106],
+      [X(L), -0.107],
+      [X(L), top - 0.002],
+      [X(L - 0.006), top],
+      [X(0.006), top],
+    ];
+    // sling slot in the triangular toe, parallel to its slanted bottom
+    const ang = Math.atan2(-0.04, -0.041);
+    const sc = [X(0.145), -0.08];
+    const slot = B.roundedRect(0.022, 0.0062, 0.0022, 3, 0, 0).map(([x, y]) => [sc[0] + x * Math.cos(ang) - y * Math.sin(ang), sc[1] + x * Math.sin(ang) + y * Math.cos(ang)] as V2);
+    // recessed side panel: the frame keeps the outline, the core sits 2.5 mm deeper
+    const pocket: V2[] = [[X(0.045), -0.01], [X(0.048), -0.05], [X(0.118), -0.057], [X(0.135), -0.063], [X(0.135), -0.004], [X(0.129), -0.001], [X(0.052), -0.001]];
+    add('Coronha', 'polymer', side(profile, -0.0175, 0.0175, 0.004, [pocket, slot], 3));
+    add('Painel lateral da coronha', 'polymer', side(pocket, -0.015, 0.015, 0.0015, [], 2));
+    // sling socket ring (QD) on both sides above the slot
+    add('Soquete QD', 'dark', B.merge(...[1, -1].map((sg) => side(B.circle(0.0062, 20, X(0.15), -0.068), sg > 0 ? 0.0172 : -0.0186, sg > 0 ? 0.0186 : -0.0172, 0.0005, [B.circle(0.0034, 16, X(0.15), -0.068)], 1))));
+    add('Soleira de borracha', 'grip', side([[X(L) + 0.0005, top - 0.001], [X(L) - 0.009, top - 0.003], [X(L) - 0.0095, -0.104], [X(L) - 0.006, -0.108], [X(L) + 0.0005, -0.1075]], -0.0195, 0.0195, 0.003, [], 2));
+    // adjustment lever under the sleeve
+    add('Trava da coronha', 'polymer', side([[X(0.004), -0.0198], [X(0.026), -0.0198], [X(0.03), -0.0255], [X(0.008), -0.0245]], -0.006, 0.006, 0.0012));
+  } else if (stockKind !== 'nenhuma') {
     // M4-type collapsible stock riding on the buffer tube (top flush with the tube, angled underside)
     const pos = n(p, 'stockPos');
     const xf = -0.07 - pos;
@@ -265,14 +304,14 @@ export function buildAR15(p: Params): WeaponPart[] {
   const baseX = 0.099 + curve + 0.002;
   add('Base do carregador', steel ? 'dark' : 'polymer', place(top(B.roundedRect(0.066, 0.0262, 0.004, 3, 0, 0), -0.0032, 0.0032, 0.0012), T.at(baseX + 0.001, magTop - magLen - 0.0018, 0), T.rz(-0.04)));
   if (!steel) {
-    // PMAG-type: textured waffle panels on both sides
+    // PMAG M2-type: large raised rectangular panels (2 columns × 3 rows) on both sides
     const bumps = [];
-    for (let r = 0; r < 6; r++)
-      for (let c = 0; c < 3; c++) {
-        const t = 0.32 + r * 0.085;
+    for (let r = 0; r < 3; r++)
+      for (let c = 0; c < 2; c++) {
+        const t = 0.3 + r * 0.2;
         const y = magTop - t * magLen;
-        const xx = 0.099 - 0.013 + c * 0.0125 + curve * t ** 1.6;
-        for (const z of [0.01125, -0.01125 - 0.0008]) bumps.push(side(B.roundedRect(0.0085, 0.0085, 0.0018, 2, xx, y), z, z + 0.0008, 0.0003, [], 1));
+        const xx = 0.099 - 0.0105 + c * 0.021 + curve * t ** 1.6;
+        for (const z of [0.01125, -0.01125 - 0.0008]) bumps.push(side(B.roundedRect(0.0175, 0.028 * (magLen / 0.165), 0.0022, 3, xx, y), z, z + 0.0008, 0.0003, [], 1));
       }
     add('Textura do carregador', 'polymer', B.merge(...bumps));
   }

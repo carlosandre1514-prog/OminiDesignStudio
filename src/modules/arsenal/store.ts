@@ -23,7 +23,10 @@ export interface ArsenalState {
   imageName: string;
   imageLength: number;
   /** 'foto' = AI photo → textured 3D; 'silhueta' = extruded outline. */
-  imageMode: 'foto' | 'silhueta';
+  /** referencia = fit the procedural weapon to the photo (+ prompt); foto = photo relief; silhueta = extruded outline. */
+  imageMode: 'referencia' | 'foto' | 'silhueta';
+  /** Last reference comparison (data URLs) and similarity. */
+  reference: { image: string; compare: string; score: number } | null;
   useAI: boolean;
   /** Relief depth for photo → 3D (fraction of length). */
   relief: number;
@@ -66,7 +69,7 @@ export interface ArsenalState {
   randomize(): void;
   toggleHidden(key: string): void;
   generateFromPrompt(text: string): Promise<void>;
-  generateFromImage(file: Blob, name: string): Promise<void>;
+  generateFromImage(file: Blob, name: string, prompt?: string): Promise<void>;
 }
 
 const frame = () => new Promise<void>((r) => (typeof requestAnimationFrame === 'function' ? requestAnimationFrame(() => setTimeout(r, 0)) : setTimeout(r, 0)));
@@ -104,7 +107,8 @@ export const useArsenal = create<ArsenalState>((set, get) => {
     imagePart: null,
     imageName: '',
     imageLength: 0.9,
-    imageMode: 'foto',
+    imageMode: 'referencia',
+    reference: null,
     useAI: true,
     relief: 0.02,
     photo: null,
@@ -180,8 +184,54 @@ export const useArsenal = create<ArsenalState>((set, get) => {
       });
     },
 
-    async generateFromImage(file, name) {
+    async generateFromImage(file, name, prompt) {
       set({ status: { kind: 'busy', text: 'Lendo imagem…' } });
+      if (get().imageMode === 'referencia') {
+        try {
+          const R = await import('./lib/reference');
+          const ref = await R.readReference(file, {
+            useAI: get().useAI,
+            onStage: (text) => set({ status: { kind: 'busy', text } }),
+            onProgress: ({ model, loaded, total }) =>
+              set({ status: { kind: 'busy', text: `Baixando IA ${model}: ${(loaded / 1048576).toFixed(1)} de ${(total / 1048576).toFixed(1)} MB (só na 1ª vez)` } }),
+          });
+          (globalThis as { __omniReference?: unknown }).__omniReference = ref.sil; // inspection/tests
+          // the prompt (if any) fixes the type and whatever it names; the image decides the rest
+          const r = prompt?.trim() ? parsePrompt(prompt, get().weaponId) : null;
+          const fit = await R.fitReference(ref.sil, WEAPONS.filter((w) => w.hd), r?.typeFound ? { weapon: r.weapon, params: r.params, locked: r.explicit } : {}, (text) => set({ status: { kind: 'busy', text } }));
+          const fromPhoto = R.finishFromColor(ref.color);
+          const base = r ? r.finish : { ...DEFAULT_FINISH, ...fit.weapon.finish };
+          const finish = r?.finishFound ? base : { ...base, ...fromPhoto };
+          const quality = r?.quality && fit.weapon.hd ? r.quality : get().quality;
+          const parts = partsFor({ source: 'catalog', imagePart: null, weaponId: fit.weapon.id, params: fit.params, seed: get().seed, quality });
+          const model = R.modelSilhouette(buildWeapon(fit.weapon, fit.params, 1, 'normal'));
+          warmTextures(parts, finish);
+          set({
+            weaponId: fit.weapon.id,
+            params: fit.params,
+            source: 'catalog',
+            parts,
+            finish,
+            edgeWear: finish.wear,
+            camo: r?.camo ? { pattern: r.camo.pattern, color: r.camo.color ?? get().camo.color } : { ...get().camo, pattern: 'nenhum' },
+            quality,
+            ...(r?.scene ? { scene: r.scene } : {}),
+            ...(r?.render ? { render: { ...get().render, ...r.render } } : {}),
+            prompt: prompt ?? get().prompt,
+            photo: null,
+            reference: { image: imgToDataUrl(ref.image), compare: imgToDataUrl(R.comparisonImage(ref.sil, model)), score: fit.score },
+            understood: [`Referência: ${name}`, ...ref.notes, ...(r ? r.understood : [`Tipo: ${fit.weapon.name} (pela imagem)`]), ...fit.notes, ...(r?.finishFound ? [] : [`Cor pela foto: ${fromPhoto.polymer}`])],
+            ignored: r?.ignored ?? [],
+            hidden: {},
+            solo: null,
+            selected: null,
+            status: { kind: 'ready', text: 'Pronto' },
+          });
+        } catch (e) {
+          set({ status: { kind: 'error', text: e instanceof Error ? e.message : 'Falha ao ler a referência' } });
+        }
+        return;
+      }
       if (get().imageMode === 'foto') {
         try {
           const { photoTo3D } = await import('./lib/photo3d');
@@ -234,3 +284,10 @@ export const useArsenal = create<ArsenalState>((set, get) => {
 
 /** Is a part currently drawn? (hidden toggle + solo/isolate). */
 export const partVisible = (s: Pick<ArsenalState, 'hidden' | 'solo'>, key: string) => !s.hidden[key] && (!s.solo || s.solo === key);
+
+/** PNG data URL of an RGBA image (browser). */
+function imgToDataUrl(img: { width: number; height: number; data: Uint8ClampedArray | Uint8Array }): string {
+  const c = Object.assign(document.createElement('canvas'), { width: img.width, height: img.height });
+  c.getContext('2d')!.putImageData(new ImageData(new Uint8ClampedArray(img.data), img.width, img.height), 0, 0);
+  return c.toDataURL('image/png');
+}

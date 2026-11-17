@@ -783,7 +783,7 @@ const ar15: WeaponType = {
     choice('grip', 'Empunhadura', [['ergo', 'Ergonômica'], ['a2', 'Clássica (A2)']]),
     choice('muzzle', 'Bocal', [['a2', 'Quebra-chamas A2'], ['freio', 'Freio de boca']]),
     choice('mag', 'Carregador', [['polimero', 'Polímero (PMAG)'], ['aluminio', 'Alumínio']]),
-    choice('stock', 'Coronha', [['m4', 'M4 retrátil'], ['nenhuma', 'Sem coronha']]),
+    choice('stock', 'Coronha', [['bcm', 'Gunfighter (BCM)'], ['m4', 'M4 retrátil'], ['nenhuma', 'Sem coronha']]),
   ],
   finish: { steel: 'escuro', polymer: 'preto', grip: 'borracha', energy: 'vermelho', wear: 0.3 },
   build: (p) => buildAR15(p),

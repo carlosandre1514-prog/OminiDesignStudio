@@ -16,6 +16,12 @@ export interface PromptResult {
   params: Params;
   finish: Finish;
   camo?: { pattern: CamoPattern; color?: string };
+  /** The weapon type was named in the prompt (not the fallback). */
+  typeFound?: boolean;
+  /** Parameters the prompt set explicitly (an image reference must not override them). */
+  explicit?: string[];
+  /** Finish words were given (colour/coating). */
+  finishFound?: boolean;
   /** Human-readable list of what was understood ("Tipo: Fuzil de assalto", "Ótica: Red dot"...). */
   understood: string[];
   /** Words that looked meaningful but were not recognised. */
@@ -86,6 +92,7 @@ interface Ctx {
   t: string;
   w: WeaponType;
   p: Params;
+  explicit: Set<string>;
   f: Finish;
   out: string[];
 }
@@ -96,6 +103,7 @@ function setChoice(c: Ctx, key: string, value: string) {
   const opt = ch?.options.find((o) => o.id === value);
   if (!ch || !opt) return false;
   c.p[key] = value;
+  c.explicit.add(key);
   c.out.push(`${ch.label}: ${opt.label}`);
   return true;
 }
@@ -105,6 +113,7 @@ function setRange(c: Ctx, key: string, frac: number, note: string) {
   const n = c.w.nums.find((x) => x.key === key);
   if (!n) return false;
   c.p[key] = Math.round((n.min + (n.max - n.min) * frac) / n.step) * n.step;
+  c.explicit.add(key);
   c.out.push(`${n.label}: ${note}`);
   return true;
 }
@@ -120,7 +129,7 @@ export function parsePrompt(prompt: string, fallbackId = 'assault-rifle'): Promp
       typeFound = true;
       break;
     }
-  const c: Ctx = { t, w: weapon, p: defaultParams(weapon), f: { ...DEFAULT_FINISH, ...weapon.finish }, out: [`Tipo: ${weapon.name}${typeFound ? '' : ' (padrão)'}`] };
+  const c: Ctx = { t, w: weapon, p: defaultParams(weapon), f: { ...DEFAULT_FINISH, ...weapon.finish }, out: [`Tipo: ${weapon.name}${typeFound ? '' : ' (padrão)'}`], explicit: new Set<string>() };
   let camo: PromptResult['camo'];
 
   // ---- attachments / shape
@@ -290,5 +299,6 @@ export function parsePrompt(prompt: string, fallbackId = 'assault-rifle'): Promp
   }
   if (render.res || render.aspect) c.out.push(`Render: ${render.res ? render.res.toUpperCase().replace('HD', 'Full HD') : ''}${render.res && render.aspect ? ' ' : ''}${render.aspect ?? ''}`);
 
-  return { weapon, params: c.p, finish: c.f, camo, understood: c.out, ignored: [...new Set(ignored)].slice(0, 8), quality, scene, render: render.res || render.aspect ? render : undefined };
+  const finishFound = JSON.stringify(c.f) !== JSON.stringify({ ...DEFAULT_FINISH, ...weapon.finish });
+  return { weapon, params: c.p, finish: c.f, camo, typeFound, explicit: [...c.explicit], finishFound, understood: c.out, ignored: [...new Set(ignored)].slice(0, 8), quality, scene, render: render.res || render.aspect ? render : undefined };
 }

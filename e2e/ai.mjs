@@ -75,6 +75,7 @@ const photoPng = () =>
 // ---------------------------------------------------------------- Arsenal: photo → 3D
 await page.goto(`${BASE}/arsenal`);
 await page.getByTestId('arsenal-root').waitFor();
+await page.getByRole('group', { name: 'Imagem → 3D' }).getByRole('button', { name: 'Foto em relevo' }).click();
 const png = Buffer.from(await photoPng(), 'base64');
 await page.getByTestId('arsenal-image-input').setInputFiles({ name: 'fuzil-foto.png', mimeType: 'image/png', buffer: png });
 assert(await until(async () => (await page.getByTestId('arsenal-parts').innerText()).includes('Modelo da foto') && /Pronto/.test(await page.getByTestId('arsenal-status').innerText()), 120000), 'Foto → 3D: modelo gerado');

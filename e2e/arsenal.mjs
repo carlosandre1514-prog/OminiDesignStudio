@@ -153,12 +153,43 @@ const tris = async (page) => Number((await page.getByTestId('arsenal-tris').inne
     g.fillRect(145, 90, 60, 45);
     return c.toDataURL('image/png').split(',')[1];
   });
-  await page.getByRole('group', { name: 'Imagem → 3D' }).getByRole('button', { name: 'Silhueta extrudada' }).click();
+  await page.getByRole('group', { name: 'Imagem → 3D' }).getByRole('button', { name: 'Silhueta', exact: true }).click();
   await page.getByTestId('arsenal-image-input').setInputFiles({ name: 'pistola.png', mimeType: 'image/png', buffer: Buffer.from(png, 'base64') });
   assert(await until(async () => (await parts.innerText()).includes('Corpo (silhueta)') && /Pronto/.test(await statusText(page))), 'PC: Imagem → 3D gera o sólido pela silhueta');
   assert(/Aberturas: 1/.test(await page.getByTestId('arsenal-understood').innerText()), 'PC: abertura do guarda-mato detectada na imagem');
   await page.waitForTimeout(600);
   if (SHOTS) await page.screenshot({ path: `${SHOTS}/arsenal-image.png` });
+  // ---- reference image (+ prompt): a tilted rifle drawn on a light background, fitted by silhouette
+  const rifle = await page.evaluate(() => {
+    const c = document.createElement('canvas');
+    c.width = 640;
+    c.height = 640;
+    const g = c.getContext('2d');
+    g.fillStyle = '#ffffff';
+    g.fillRect(0, 0, 640, 640);
+    g.translate(320, 320);
+    g.rotate(-Math.PI / 5);
+    g.fillStyle = '#1b1c1e';
+    g.fillRect(-250, -18, 150, 40); // stock
+    g.fillRect(-110, -10, 60, 16); // buffer tube
+    g.fillRect(-60, -22, 120, 40); // receiver
+    g.fillRect(60, -14, 120, 28); // handguard
+    g.fillRect(180, -5, 90, 10); // barrel
+    g.fillRect(-35, 18, 26, 60); // grip
+    g.fillRect(20, 18, 34, 85); // magazine
+    return c.toDataURL('image/png').split(',')[1];
+  });
+  await page.getByRole('group', { name: 'Imagem → 3D' }).getByRole('button', { name: 'Referência (modelo fiel)' }).click();
+  await page.getByTestId('arsenal-prompt').fill('fuzil com mira holográfica');
+  // without network AI models here: plain-background cut-out
+  const aiSwitch = page.getByRole('switch', { name: /IA no aparelho/ });
+  if ((await aiSwitch.getAttribute('aria-checked')) === 'true') await aiSwitch.click();
+  await page.getByTestId('arsenal-image-input').setInputFiles({ name: 'referencia.png', mimeType: 'image/png', buffer: Buffer.from(rifle, 'base64') });
+  assert(await until(async () => (await page.getByTestId('arsenal-reference').count()) > 0 && /Pronto/.test(await statusText(page)), 120000), 'PC: imagem de referência + texto gera o modelo ajustado');
+  const refUnd = await page.getByTestId('arsenal-understood').innerText();
+  assert(/Arma endireitada/.test(refUnd) && /Semelhança com a referência: \d+%/.test(refUnd) && /Holográfica/.test(refUnd), `PC: referência endireitada, comparada e o texto respeitado (${refUnd.replace(/\s+/g, ' ').slice(0, 160)})`);
+  assert(/\d+% parecido/.test(await page.getByTestId('arsenal-reference-score').innerText()), 'PC: comparação referência × modelo exibida');
+
 
   // ---- open in the full 3D studio
   await page.getByRole('group', { name: 'Tipo' }).count(); // panel still there

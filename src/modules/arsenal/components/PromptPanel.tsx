@@ -24,8 +24,8 @@ export const EXAMPLES = [
  */
 export function PromptPanel() {
   const p = useProfile();
-  const { prompt, status, understood, ignored, imageLength, imageMode, useAI, relief } = useArsenal(
-    useShallow((s) => ({ prompt: s.prompt, status: s.status, understood: s.understood, ignored: s.ignored, imageLength: s.imageLength, imageMode: s.imageMode, useAI: s.useAI, relief: s.relief })),
+  const { prompt, status, understood, ignored, imageLength, imageMode, useAI, relief, reference } = useArsenal(
+    useShallow((s) => ({ prompt: s.prompt, status: s.status, understood: s.understood, ignored: s.ignored, imageLength: s.imageLength, imageMode: s.imageMode, useAI: s.useAI, relief: s.relief, reference: s.reference })),
   );
   const [text, setText] = useState(prompt || EXAMPLES[0]);
   const file = useRef<HTMLInputElement>(null);
@@ -54,7 +54,7 @@ export function PromptPanel() {
           <Wand2 size={16} /> Gerar a partir do texto
         </Btn>
         <Btn onClick={() => file.current?.click()} disabled={busy} data-testid="arsenal-image">
-          <ImageUp size={16} /> {imageMode === 'foto' ? 'Foto → 3D (IA)' : 'Imagem → 3D'}
+          <ImageUp size={16} /> {imageMode === 'referencia' ? (text.trim() ? 'Imagem de referência + texto' : 'Imagem de referência') : imageMode === 'foto' ? 'Foto → 3D (IA)' : 'Imagem → 3D'}
         </Btn>
         <input
           ref={file}
@@ -65,7 +65,7 @@ export function PromptPanel() {
           data-testid="arsenal-image-input"
           onChange={(e) => {
             const f = e.target.files?.[0];
-            if (f) void useArsenal.getState().generateFromImage(f, f.name);
+            if (f) void useArsenal.getState().generateFromImage(f, f.name, imageMode === 'referencia' ? text : undefined);
             e.target.value = '';
           }}
         />
@@ -74,14 +74,20 @@ export function PromptPanel() {
         label="Imagem → 3D"
         value={imageMode}
         options={[
-          { id: 'foto', label: 'Foto realista (textura + relevo)' },
-          { id: 'silhueta', label: 'Silhueta extrudada' },
+          { id: 'referencia', label: 'Referência (modelo fiel)' },
+          { id: 'foto', label: 'Foto em relevo' },
+          { id: 'silhueta', label: 'Silhueta' },
         ]}
         onChange={(v) => useArsenal.getState().set({ imageMode: v })}
       />
+      {imageMode === 'referencia' && (
+        <p className={`leading-snug text-zinc-400 ${p === 'tv' ? 'text-sm' : 'text-[10px]'}`}>
+          Envie a foto da arma (pode estar inclinada). O Omini recorta, endireita e ajusta tipo, cano, guarda-mão, coronha, ótica e carregador até a silhueta bater com a foto. A cor vem da foto. O que você escrever no prompt tem prioridade.
+        </p>
+      )}
+      {imageMode !== 'silhueta' && <Toggle label={`IA no aparelho (${hasWebGPU() ? 'GPU' : 'CPU'})`} checked={useAI} onChange={(v) => useArsenal.getState().set({ useAI: v })} />}
       {imageMode === 'foto' && (
         <>
-          <Toggle label={`IA no aparelho (${hasWebGPU() ? 'GPU' : 'CPU'})`} checked={useAI} onChange={(v) => useArsenal.getState().set({ useAI: v })} />
           <Slider label="Profundidade do relevo" value={relief} min={0} max={0.06} step={0.002} format={(v) => `${(v * imageLength * 100).toFixed(1)} cm`} onChange={(v) => useArsenal.getState().set({ relief: v })} />
           {useAI && (
             <p className={`leading-snug text-zinc-400 ${p === 'tv' ? 'text-sm' : 'text-[10px]'}`}>
@@ -90,7 +96,18 @@ export function PromptPanel() {
           )}
         </>
       )}
-      <Slider label="Comprimento real (Imagem → 3D)" value={imageLength} min={0.15} max={2} step={0.05} format={(v) => `${Math.round(v * 100)} cm`} onChange={(v) => useArsenal.getState().set({ imageLength: v })} />
+      {reference && imageMode === 'referencia' && (
+        <div className="rounded-lg border border-white/10 bg-black/30 p-2" data-testid="arsenal-reference">
+          <div className={`mb-1 flex items-center justify-between ${p === 'tv' ? 'text-sm' : 'text-[11px]'} text-zinc-300`}>
+            <span>Referência × modelo</span>
+            <span className="font-semibold text-cyan-200" data-testid="arsenal-reference-score">{Math.round(reference.score * 100)}% parecido</span>
+          </div>
+          <img src={reference.image} alt="Referência endireitada" className="mb-1 max-h-24 w-full object-contain" />
+          <img src={reference.compare} alt="Silhuetas: referência (ciano), modelo (laranja), iguais (branco)" className="w-full object-contain" style={{ imageRendering: 'pixelated' }} />
+          <div className="mt-1 text-[10px] text-zinc-500">ciano = só na foto · laranja = só no modelo · branco = igual</div>
+        </div>
+      )}
+      {imageMode !== 'referencia' && <Slider label="Comprimento real (Imagem → 3D)" value={imageLength} min={0.15} max={2} step={0.05} format={(v) => `${Math.round(v * 100)} cm`} onChange={(v) => useArsenal.getState().set({ imageLength: v })} />}
       <details className="text-zinc-400">
         <summary className={`cursor-pointer rounded ${p === 'tv' ? 'text-base' : 'text-xs'} ${FOCUS}`}>Exemplos de prompt</summary>
         <div className="mt-2 flex flex-col gap-1.5">
