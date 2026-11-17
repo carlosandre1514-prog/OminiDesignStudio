@@ -93,7 +93,7 @@ export function dataTexture(rgba: Uint8ClampedArray, size: number, srgb: boolean
 }
 
 /** Texture set of a slot with the coating applied (pure, used by the viewport and by "send to studio"). */
-export function slotTextures(slot: Slot, spec: MaterialSpec, s: Pick<SurfaceSettings, 'camo'>, size = 256): TextureSet | null {
+export function slotTextures(slot: Slot, spec: MaterialSpec, s: Pick<SurfaceSettings, 'camo'>, size = 512): TextureSet | null {
   if (!spec.pattern) return null;
   const base = texturesFor(spec.pattern, size);
   return COATED.includes(slot) && s.camo.pattern !== 'nenhum' ? camouflage(base, s.camo.pattern, s.camo.color) : base;
@@ -114,11 +114,11 @@ export function useWeaponMaterials(slots: Slot[], s: SurfaceSettings) {
   const uniforms = useMemo(() => ({ metal: createWearUniforms(), polymer: createWearUniforms(), wood: createWearUniforms() }), []);
   useMemo(() => {
     // Subtle: worn coatings reveal grey steel/aluminium, not chrome.
-    uniforms.metal.uBare.value.set('#aab0b8');
+    uniforms.metal.uBare.value.set('#868b92');
     uniforms.metal.uBareMetal.value = 1;
     uniforms.polymer.uBare.value.set('#56565a');
     uniforms.polymer.uBareMetal.value = 0;
-    uniforms.wood.uBare.value.set('#c9a27a');
+    uniforms.wood.uBare.value.set('#8a5636');
     uniforms.wood.uBareMetal.value = 0;
   }, [uniforms]);
 
@@ -128,7 +128,10 @@ export function useWeaponMaterials(slots: Slot[], s: SurfaceSettings) {
     const map = new Map<Slot, THREE.MeshStandardMaterial & { userData: { spec: MaterialSpec } }>();
     for (const slot of slotList.split(',').filter(Boolean) as Slot[]) {
       const spec = materialFor(slot, s.finish);
-      const m = new THREE.MeshStandardMaterial({ color: spec.color, metalness: spec.metalness, roughness: spec.roughness }) as THREE.MeshStandardMaterial & { userData: { spec: MaterialSpec } };
+      // varnished wood gets a real clear coat (sharp reflections over a satin base)
+      const m = (spec.clearcoat
+        ? new THREE.MeshPhysicalMaterial({ color: spec.color, metalness: spec.metalness, roughness: spec.roughness, clearcoat: spec.clearcoat, clearcoatRoughness: 0.4 })
+        : new THREE.MeshStandardMaterial({ color: spec.color, metalness: spec.metalness, roughness: spec.roughness })) as THREE.MeshStandardMaterial & { userData: { spec: MaterialSpec } };
       m.name = spec.name;
       m.userData.spec = spec;
       if (spec.emissive) {

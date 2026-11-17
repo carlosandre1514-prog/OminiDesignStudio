@@ -86,7 +86,7 @@ function partsFor(s: Pick<ArsenalState, 'source' | 'imagePart' | 'weaponId' | 'p
 function warmTextures(parts: WeaponPart[], finish: Finish) {
   for (const p of parts) {
     const pat = materialFor(p.slot, finish).pattern;
-    if (pat) texturesFor(pat, 256);
+    if (pat) texturesFor(pat, 512);
   }
 }
 

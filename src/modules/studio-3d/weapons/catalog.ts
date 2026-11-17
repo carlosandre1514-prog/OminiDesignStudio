@@ -20,6 +20,8 @@ export interface WeaponPart {
   uv?: 'box' | 'planarXY';
   /** false = never Catmull–Clark subdivide (parts built from abutting segments, thin shells). */
   subdiv?: boolean;
+  /** false = no procedural edge wear on this part (e.g. long lofted magazines). */
+  wear?: boolean;
 }
 
 export type Category = 'melee' | 'firearm' | 'ranged' | 'scifi';
@@ -819,7 +821,7 @@ const akHD: WeaponType = {
     choice('muzzle', 'Bocal', [['slant', 'Compensador inclinado'], ['freio', 'Freio de boca']]),
     choice('mag', 'Carregador', [['aco', 'Aço'], ['polimero', 'Polímero']]),
   ],
-  finish: { steel: 'escuro', wood: 'carvalho', polymer: 'preto', grip: 'borracha', energy: 'vermelho', wear: 0.4 },
+  finish: { steel: 'escuro', wood: 'carvalho', polymer: 'preto', grip: 'borracha', energy: 'vermelho', wear: 0.25 },
   build: (p) => buildAK(p),
 };
 

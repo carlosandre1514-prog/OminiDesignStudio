@@ -63,7 +63,7 @@ export function WeaponModel() {
       const geometry = toBufferGeometry(p.mesh, { shading: p.shading ?? 'auto', uv: p.uv ?? 'box' });
       const wear = edgeWearAttributes(p.mesh);
       // segmented parts: the internal butt joints are not real edges, so no edge wear there
-      if (p.subdiv === false) wear.edgeH.fill(-1);
+      if (p.subdiv === false || p.wear === false) wear.edgeH.fill(-1);
       geometry.setAttribute('bary', new THREE.BufferAttribute(wear.bary, 3));
       geometry.setAttribute('edgeH', new THREE.BufferAttribute(wear.edgeH, 3));
       return { part: p, geometry };
@@ -100,7 +100,10 @@ export function WeaponModel() {
       .then((geos) => {
         if (!alive) return;
         let total = 0;
-        const made = geos.map((g) => {
+        const wearOf = parts.filter((_, i) => subd[i]).map((p) => p.wear !== false);
+        const made = geos.map((g, gi2) => {
+          // parts without wear: neutral curvature (no worn edges)
+          if (!wearOf[gi2]) g.curv.fill(0);
           const b = new THREE.BufferGeometry();
           b.setAttribute('position', new THREE.BufferAttribute(g.position, 3));
           b.setAttribute('normal', new THREE.BufferAttribute(g.normal, 3));

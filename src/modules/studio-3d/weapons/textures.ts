@@ -44,6 +44,8 @@ export interface MaterialSpec {
   emissiveIntensity?: number;
   opacity?: number;
   normalScale?: number;
+  /** Varnish / lacquer layer (0..1): rendered with a physical clear coat. */
+  clearcoat?: number;
   /** pattern used to build the maps; none = plain material */
   pattern?: Pattern;
 }
@@ -84,6 +86,8 @@ export function materialFor(slot: Slot, f: Finish): MaterialSpec {
     case 'metal':
       return steel('metal');
     case 'dark':
+      if (f.steel === 'escuro')
+        return { key: 'oxidado', name: 'Aço oxidado (blued)', color: '#ffffff', metalness: 0.65, roughness: 1, pattern: { kind: 'blackened', dark: [36, 37, 40], light: [66, 68, 73], rough: [0.46, 0.62], wear: w, seed: 21 } };
       return { key: 'parkerizado', name: 'Metal fosfatizado', color: '#ffffff', metalness: 0.75, roughness: 1, pattern: { kind: 'blackened', dark: [50, 52, 53], light: [80, 83, 84], rough: [0.42, 0.62], wear: w, seed: 21 } };
     case 'trim': {
       const pal: Record<Finish['trim'], [RGB, RGB]> = { ouro: [[160, 112, 30], [255, 214, 120]], latao: [[130, 98, 40], [228, 196, 120]], bronze: [[90, 56, 30], [196, 140, 90]], aco: [[120, 124, 130], [210, 214, 220]] };
@@ -91,9 +95,9 @@ export function materialFor(slot: Slot, f: Finish): MaterialSpec {
       return { key: `trim-${f.trim}`, name: FINISH_LABELS.trim.options[f.trim], color: '#ffffff', metalness: 1, roughness: 1, pattern: { kind: 'hammered', dark, light, rough: [0.2, 0.45], wear: w, seed: 31 } };
     }
     case 'wood': {
-      const pal: Record<Finish['wood'], [RGB, RGB]> = { carvalho: [[62, 28, 17], [112, 54, 32]], nogueira: [[58, 34, 20], [124, 80, 48]], ebano: [[18, 14, 12], [58, 44, 36]], freixo: [[160, 126, 88], [226, 196, 150]] };
+      const pal: Record<Finish['wood'], [RGB, RGB]> = { carvalho: [[30, 15, 9], [86, 42, 23]], nogueira: [[58, 34, 20], [124, 80, 48]], ebano: [[18, 14, 12], [58, 44, 36]], freixo: [[160, 126, 88], [226, 196, 150]] };
       const [dark, light] = pal[f.wood];
-      return { key: `wood-${f.wood}`, name: FINISH_LABELS.wood.options[f.wood], color: '#ffffff', metalness: 0, roughness: 1, pattern: { kind: 'wood', dark, light, rough: [0.45, 0.75], wear: w, seed: 41 } };
+      return { key: `wood-${f.wood}`, name: FINISH_LABELS.wood.options[f.wood], color: '#ffffff', metalness: 0, roughness: 1, pattern: { kind: 'wood', dark, light, rough: [0.38, 0.72], wear: w, seed: 41 }, clearcoat: 0.35 };
     }
     case 'grip': {
       const kind: Pattern['kind'] = f.grip === 'tecido' ? 'wrap' : f.grip === 'borracha' ? 'rubber' : 'leather';
@@ -240,8 +244,9 @@ function sampler(p: Pattern) {
         break;
       }
       case 'blackened': {
+        // oxide / bluing: nearly uniform, faint cloudiness only
         const n = fbm(u, v, 8, 8);
-        mix = 0.3 + n * 0.4 + fbm2(u, v, 32, 32, 2) * 0.2;
+        mix = 0.42 + (n - 0.5) * 0.22 + (fbm2(u, v, 32, 32, 2) - 0.5) * 0.12;
         h = 0.5 + (fbm(u, v, 48, 48, 2) - 0.5) * 0.05;
         rough = 0.35 + mix * 0.65;
         break;
@@ -254,12 +259,18 @@ function sampler(p: Pattern) {
         break;
       }
       case 'wood': {
-        const warp = fbm(u, v, 3, 2) * 2.2;
-        const ring = 0.5 + 0.5 * Math.sin((u * 9 + warp) * Math.PI * 2);
-        const fibre = fbm2(u, v, 160, 3, 2);
-        mix = ring * 0.55 + fibre * 0.45;
-        h = 0.5 + (fibre - 0.5) * 0.5 - (1 - ring) * 0.1;
-        rough = 0.6 + (1 - ring) * 0.4;
+        // Varnished hardwood / birch laminate: soft colour drift, thin dark latewood lines that wander
+        // with the grain, fine fibres and sparse open pores — low contrast, like real gun stocks.
+        const drift = fbm2(u, v, 2, 3);
+        const warp = fbm(u, v, 3, 3) * 1.6 + fbm2(u, v, 9, 2) * 0.25;
+        const t = u * 5 + warp;
+        const late = Math.pow(0.5 + 0.5 * Math.cos(t * Math.PI * 2), 12);
+        const fibre = fbm2(u, v, 96, 6, 3);
+        const pore = clamp01((fbm(u, v, 160, 10, 2) - 0.68) * 6);
+        mix = clamp01(0.55 + (drift - 0.5) * 0.55 - late * 0.2 + (fibre - 0.5) * 0.16 - pore * 0.18);
+        h = 0.5 - late * 0.01 + (fibre - 0.5) * 0.015 - pore * 0.012;
+        // varnish: fairly even sheen, pores and latewood a little duller
+        rough = 0.25 + late * 0.25 + pore * 0.5 + (fibre - 0.5) * 0.1;
         break;
       }
       case 'leather': {
@@ -318,13 +329,14 @@ function scratchMask(p: Pattern, size: number): Float32Array {
   const mask = new Float32Array(size * size);
   if (p.wear <= 0) return mask;
   const r = rng(p.seed + 99);
-  const count = Math.round(8 + p.wear * 60);
+  // real scratches are short (4–15 mm on a 25 cm tile) and rare on varnished wood
+  const count = Math.round((4 + p.wear * 40) * (p.kind === 'wood' ? 0.35 : 1));
   const k = Math.min(1, 0.4 + p.wear);
   for (let n = 0; n < count; n++) {
     const x = r.next() * size;
     const y = r.next() * size;
     const a = r.range(-0.5, 0.5) + (p.kind === 'brushed' ? Math.PI / 2 : r.range(0, Math.PI));
-    const len = r.range(0.03, 0.18) * size;
+    const len = r.range(0.016, 0.06) * size;
     const w = r.range(0.4, 1.1);
     const steps = Math.ceil(len * 2);
     for (let t = 0; t <= steps; t++) {
@@ -345,7 +357,7 @@ function scratchMask(p: Pattern, size: number): Float32Array {
 }
 
 /** Normal-map strength per pattern: fine finishes get subtle relief, cord wraps and leather get more. */
-const BUMP: Record<Pattern['kind'], number> = { brushed: 1.2, damascus: 1.5, blackened: 0.8, hammered: 2.5, wood: 1.6, leather: 2.2, wrap: 3, rubber: 0.55, polymer: 0.5, rust: 2.5 };
+const BUMP: Record<Pattern['kind'], number> = { brushed: 1.2, damascus: 1.5, blackened: 0.8, hammered: 2.5, wood: 0.6, leather: 2.2, wrap: 3, rubber: 0.55, polymer: 0.5, rust: 2.5 };
 
 export function synthesize(p: Pattern, size = 256): TextureSet {
   const sample = sampler(p);
@@ -362,7 +374,7 @@ export function synthesize(p: Pattern, size = 256): TextureSet {
       const sc = scratch[i];
       if (sc > 0) {
         s.h = clamp01(s.h - sc * (p.kind === 'rubber' || p.kind === 'polymer' ? 0 : 0.04));
-        s.mix = clamp01(s.mix + sc * 0.5);
+        s.mix = clamp01(s.mix + sc * (p.kind === 'wood' ? 0.08 : 0.5));
         s.rough = clamp01(s.rough - sc * 0.3);
       }
       height[i] = s.h;
