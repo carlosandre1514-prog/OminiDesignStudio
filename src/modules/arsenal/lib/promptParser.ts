@@ -32,7 +32,17 @@ export const normalize = (s: string) =>
     .replace(/\s+/g, ' ')
     .trim();
 
-const has = (text: string, ...words: string[]) => words.some((w) => new RegExp(`(^|[\\s-])${w.replace(/[.]/g, '\\.')}(?=$|[\\s-])`).test(text));
+/** Words matched during the current parse (to report the unrecognised ones). */
+let matched = new Set<string>();
+const has = (text: string, ...words: string[]) => {
+  let hit = false;
+  for (const w of words)
+    if (new RegExp(`(^|[\\s-])${w.replace(/[.]/g, '\\.')}(?=$|[\\s-])`).test(text)) {
+      hit = true;
+      w.split(' ').forEach((x) => matched.add(x));
+    }
+  return hit;
+};
 
 /** Weapon type vocabulary, most specific first. */
 const TYPE_RULES: [string, string[]][] = [
@@ -90,6 +100,7 @@ function setRange(c: Ctx, key: string, frac: number, note: string) {
 
 export function parsePrompt(prompt: string, fallbackId = 'assault-rifle'): PromptResult {
   const t = normalize(prompt);
+  matched = new Set();
   let weapon = WEAPONS.find((w) => w.id === fallbackId) ?? WEAPONS[0];
   let typeFound = false;
   for (const [id, words] of TYPE_RULES)
@@ -224,7 +235,7 @@ export function parsePrompt(prompt: string, fallbackId = 'assault-rifle'): Promp
   const flat = [...TYPE_RULES.flatMap(([, w]) => w), ...OPTIC_REDDOT, ...OPTIC_SCOPE].join(' ');
   const ignored = t
     .split(' ')
-    .filter((w) => w.length > 3 && !known.has(w) && !flat.includes(w) && !c.out.some((o) => normalize(o).includes(w)) && !/^[\d.]+$/.test(w));
+    .filter((w) => w.length > 3 && !known.has(w) && !matched.has(w) && !flat.includes(w) && !c.out.some((o) => normalize(o).includes(w)) && !/^[\d.]+$/.test(w));
 
   return { weapon, params: c.p, finish: c.f, camo, understood: c.out, ignored: [...new Set(ignored)].slice(0, 8) };
 }

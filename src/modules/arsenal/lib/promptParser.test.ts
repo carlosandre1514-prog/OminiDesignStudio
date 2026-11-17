@@ -20,6 +20,7 @@ describe('parsePrompt (local text-to-3D)', () => {
     expect(s.camo?.pattern).toBe('woodland');
     expect(s.finish.wear).toBeGreaterThan(0.7);
     expect(Number(s.params.barrel)).toBeGreaterThan(0.7);
+    expect(s.ignored).not.toContain('desgastado');
 
     const k = parsePrompt('Katana com lâmina de damasco e cabo de tecido');
     expect(k.weapon.id).toBe('katana');

@@ -16,6 +16,7 @@ const Storage = lazy(() => import('@/pages/Storage'));
 const Settings = lazy(() => import('@/pages/Settings'));
 const Workspace = lazy(() => import('@/pages/Workspace'));
 const NotFound = lazy(() => import('@/pages/NotFound'));
+const Arsenal = lazy(() => import('@/modules/arsenal/ArsenalApp'));
 
 export default function App() {
   const { load, settings } = useSettings();
@@ -41,6 +42,7 @@ export default function App() {
               <Route path="settings" element={<Settings />} />
               <Route path="*" element={<NotFound />} />
             </Route>
+            <Route path="arsenal" element={<Arsenal />} />
             <Route path="project/:projectId" element={<Workspace />} />
             <Route path="project/:projectId/:moduleId" element={<Workspace />} />
           </Routes>

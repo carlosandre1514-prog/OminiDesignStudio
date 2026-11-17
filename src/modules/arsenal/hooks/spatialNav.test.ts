@@ -26,6 +26,13 @@ describe('spatial navigation', () => {
     expect(nav(6, 'up')).toBe(4); // wide button: the control right above its centre
   });
 
+  it('skips candidates overlapping the current element in the travel direction', () => {
+    const viewport: Box = { x: 0, y: 0, w: 1400, h: 900 };
+    const inside: Box = { x: 1300, y: 840, w: 50, h: 50 };
+    const panel: Box = { x: 1420, y: 100, w: 150, h: 60 };
+    expect(pickNext(viewport, [inside, panel], 'right')).toBe(1);
+  });
+
   it('lets sliders and text fields keep their own arrows', () => {
     const range = Object.assign(document.createElement('input'), { type: 'range' });
     expect(keepsArrow(range, 'left')).toBe(true);

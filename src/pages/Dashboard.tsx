@@ -35,6 +35,7 @@ export default function Dashboard() {
           <p className="mt-1 text-sm text-ink-400">Uma plataforma, múltiplas disciplinas de criação, um único ecossistema.</p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <Link to="/arsenal" className="btn-outline" data-testid="open-arsenal">⌖ Arsenal 3D</Link>
           <button className="btn-outline" onClick={openImport}>Abrir / importar…</button>
           <button className="btn-primary" onClick={() => { setTpl(undefined); setNewOpen(true); }}>+ Novo projeto</button>
         </div>

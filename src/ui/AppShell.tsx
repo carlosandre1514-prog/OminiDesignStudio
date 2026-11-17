@@ -9,6 +9,7 @@ const NAV = [
   { to: '/projects', label: 'Projetos', icon: '▤' },
   { to: '/assets', label: 'Biblioteca', icon: '◫' },
   { to: '/templates', label: 'Modelos', icon: '❏' },
+  { to: '/arsenal', label: 'Arsenal 3D', icon: '⌖' },
   { to: '/history', label: 'Histórico', icon: '↺' },
   { to: '/storage', label: 'Armazenamento', icon: '⛁' },
   { to: '/account', label: 'Conta e nuvem', icon: '☁' },

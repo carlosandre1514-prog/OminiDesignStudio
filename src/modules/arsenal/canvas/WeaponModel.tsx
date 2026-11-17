@@ -1,0 +1,97 @@
+import { Edges } from '@react-three/drei';
+import { useFrame, type ThreeEvent } from '@react-three/fiber';
+import { useEffect, useMemo, useRef } from 'react';
+import * as THREE from 'three';
+import { toBufferGeometry } from '@/modules/studio-3d/geometry';
+import { useShallow } from 'zustand/react/shallow';
+import { isHorizontal } from '@/modules/studio-3d/weapons/assemble';
+import { edgeWearAttributes } from '../lib/surface';
+import { partVisible, useArsenal, weaponById } from '../store';
+import { useWeaponMaterials } from './useWeaponMaterials';
+
+/** The group that is exported (GLB/GLTF/OBJ) — set while the model is mounted. */
+export const exportRoot: { current: THREE.Group | null } = { current: null };
+
+/**
+ * The weapon: one mesh per part, PBR materials per slot, exploded view (parts slide away from the
+ * centre for disassembly), hide / isolate, click to select (cyan outline).
+ */
+export function WeaponModel() {
+  const { parts, finish, camo, edgeWear, roughness, metalness, explode, selected, hidden, solo, weaponId, source } = useArsenal(
+    useShallow((s) => ({ parts: s.parts, finish: s.finish, camo: s.camo, edgeWear: s.edgeWear, roughness: s.roughness, metalness: s.metalness, explode: s.explode, selected: s.selected, hidden: s.hidden, solo: s.solo, weaponId: s.weaponId, source: s.source })),
+  );
+  const horizontal = source === 'image' || isHorizontal(weaponById(weaponId));
+  const materials = useWeaponMaterials(parts.map((p) => p.slot), { finish, camo, edgeWear, roughness, metalness, horizontal });
+
+  const model = useMemo(() => {
+    const items = parts.map((p) => {
+      const geometry = toBufferGeometry(p.mesh, { shading: p.shading ?? 'auto', uv: 'box' });
+      const wear = edgeWearAttributes(p.mesh);
+      geometry.setAttribute('bary', new THREE.BufferAttribute(wear.bary, 3));
+      geometry.setAttribute('edgeH', new THREE.BufferAttribute(wear.edgeH, 3));
+      return { part: p, geometry };
+    });
+    // Explode directions: from the weapon centre to each part centre.
+    const all = new THREE.Box3();
+    items.forEach((i) => i.geometry.boundingBox && all.union(i.geometry.boundingBox));
+    const center = all.getCenter(new THREE.Vector3());
+    const size = all.getSize(new THREE.Vector3()).length();
+    const lift = Number.isFinite(all.min.y) ? -all.min.y : 0;
+    const list = items.map((i, idx) => {
+      const c = i.geometry.boundingBox!.getCenter(new THREE.Vector3());
+      const dir = c.sub(center);
+      if (dir.lengthSq() < 1e-8) dir.set(0, idx % 2 ? -1 : 1, 0);
+      return { ...i, offset: dir.normalize().multiplyScalar(size * 0.16) };
+    });
+    return { list, lift };
+  }, [parts]);
+  const built = model.list;
+  useEffect(() => () => built.forEach((b) => b.geometry.dispose()), [built]);
+
+  const group = useRef<THREE.Group>(null);
+  useEffect(() => {
+    exportRoot.current = group.current;
+    return () => {
+      exportRoot.current = null;
+    };
+  }, []);
+
+  // Smoothly animate the exploded offsets.
+  const meshes = useRef<(THREE.Mesh | null)[]>([]);
+  useFrame((_, dt) => {
+    const k = 1 - Math.exp(-dt * 10);
+    built.forEach((b, i) => {
+      const m = meshes.current[i];
+      if (!m) return;
+      const target = b.offset.clone().multiplyScalar(explode);
+      m.position.lerp(target, k);
+    });
+  });
+
+  const select = (key: string) => (e: ThreeEvent<MouseEvent>) => {
+    e.stopPropagation();
+    useArsenal.getState().set({ selected: useArsenal.getState().selected === key ? null : key });
+  };
+
+  return (
+    <group ref={group} name="Arma" position={[0, model.lift, 0]}>
+      {built.map((b, i) => (
+        <mesh
+          key={b.part.key}
+          ref={(m) => {
+            meshes.current[i] = m;
+          }}
+          name={b.part.name}
+          geometry={b.geometry}
+          material={materials.get(b.part.slot)}
+          visible={partVisible({ hidden, solo }, b.part.key)}
+          castShadow
+          receiveShadow
+          onClick={select(b.part.key)}
+        >
+          {selected === b.part.key && <Edges threshold={25} color="#22d3ee" />}
+        </mesh>
+      ))}
+    </group>
+  );
+}

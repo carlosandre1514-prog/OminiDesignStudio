@@ -15,9 +15,9 @@ export interface Box {
 export const KEY_DIR: Record<string, Dir> = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right' };
 
 /**
- * Pick the best candidate in a direction: it must lie beyond the current element on that axis;
- * the score favours small distance along the axis and penalises sideways offset twice as much,
- * with a bonus for candidates overlapping the current element's row/column (keeps movement in lanes).
+ * Pick the best candidate in a direction: it must lie beyond the current element's edge on that axis.
+ * Score = gap along the axis + 2 × sideways gap between the two spans (centre offset only breaks ties),
+ * plus a penalty for candidates outside the current row/column (keeps movement in lanes).
  */
 export function pickNext(from: Box, candidates: Box[], dir: Dir): number {
   const cx = from.x + from.w / 2;
@@ -33,26 +33,26 @@ export function pickNext(from: Box, candidates: Box[], dir: Dir): number {
     switch (dir) {
       case 'right':
         main = c.x - (from.x + from.w);
-        if (ox <= cx + 1) return;
-        side = Math.abs(oy - cy);
+        if (ox <= cx + 1 || main < -Math.min(from.w, c.w) / 2) return;
+        side = Math.max(0, c.y - (from.y + from.h), from.y - (c.y + c.h)) + Math.abs(oy - cy) * 0.1;
         overlap = c.y < from.y + from.h && c.y + c.h > from.y;
         break;
       case 'left':
         main = from.x - (c.x + c.w);
-        if (ox >= cx - 1) return;
-        side = Math.abs(oy - cy);
+        if (ox >= cx - 1 || main < -Math.min(from.w, c.w) / 2) return;
+        side = Math.max(0, c.y - (from.y + from.h), from.y - (c.y + c.h)) + Math.abs(oy - cy) * 0.1;
         overlap = c.y < from.y + from.h && c.y + c.h > from.y;
         break;
       case 'down':
         main = c.y - (from.y + from.h);
-        if (oy <= cy + 1) return;
-        side = Math.abs(ox - cx);
+        if (oy <= cy + 1 || main < -Math.min(from.h, c.h) / 2) return;
+        side = Math.max(0, c.x - (from.x + from.w), from.x - (c.x + c.w)) + Math.abs(ox - cx) * 0.1;
         overlap = c.x < from.x + from.w && c.x + c.w > from.x;
         break;
       case 'up':
         main = from.y - (c.y + c.h);
-        if (oy >= cy - 1) return;
-        side = Math.abs(ox - cx);
+        if (oy >= cy - 1 || main < -Math.min(from.h, c.h) / 2) return;
+        side = Math.max(0, c.x - (from.x + from.w), from.x - (c.x + c.w)) + Math.abs(ox - cx) * 0.1;
         overlap = c.x < from.x + from.w && c.x + c.w > from.x;
         break;
     }
@@ -65,7 +65,7 @@ export function pickNext(from: Box, candidates: Box[], dir: Dir): number {
   return best;
 }
 
-const FOCUSABLE = 'button:not([disabled]), [href], input:not([disabled]):not([type=hidden]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+const FOCUSABLE = 'button:not([disabled]):not([tabindex="-1"]), [href]:not([tabindex="-1"]), input:not([disabled]):not([type=hidden]):not([tabindex="-1"]), select:not([disabled]):not([tabindex="-1"]), textarea:not([disabled]):not([tabindex="-1"]), summary, [tabindex]:not([tabindex="-1"])';
 
 /** Visible focusable elements inside a root (skips elements in closed panels / zero size). */
 export function focusables(root: ParentNode = document): HTMLElement[] {
@@ -113,10 +113,15 @@ export function moveFocus(dir: Dir, root: ParentNode = document): boolean {
     list[0].focus();
     return true;
   }
-  const others = list.filter((e) => e !== active);
+  // Never jump into or out to an ancestor/descendant of the current element (e.g. buttons drawn over the viewport).
+  const others = list.filter((e) => e !== active && !active.contains(e) && !e.contains(active));
   const i = pickNext(toBox(active.getBoundingClientRect()), others.map((e) => toBox(e.getBoundingClientRect())), dir);
   if (i < 0) return false;
-  others[i].focus();
-  others[i].scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  let target = others[i];
+  // Entering a tab list from outside lands on the selected tab (ARIA tabs pattern).
+  const list2 = target.getAttribute('role') === 'tab' ? target.closest('[role=tablist]') : null;
+  if (list2 && !list2.contains(active)) target = list2.querySelector<HTMLElement>('[role=tab][aria-selected=true]') ?? target;
+  target.focus();
+  target.scrollIntoView({ block: 'nearest', inline: 'nearest' });
   return true;
 }
